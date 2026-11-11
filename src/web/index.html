@@ -1,0 +1,1239 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GAPSENSE S2 标定软件</title>
+<style>
+
+:root{
+  --bg:#0d1117;--card:#161b22;--card2:#1c2129;--border:#2d333b;
+  --text:#e6edf3;--muted:#8b949e;--accent:#58a6ff;--green:#3fb950;--red:#f85149;--orange:#d29922;--purple:#bc8cff;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:"Segoe UI","Microsoft YaHei",sans-serif;min-height:100vh;padding:24px}
+.wrap{max-width:1100px;margin:0 auto}
+h1{font-size:22px;font-weight:600;margin-bottom:4px}
+.sub{color:var(--muted);font-size:13px;margin-bottom:20px}
+/* 传感器选择 */
+.sec-title{font-size:13px;color:var(--muted);margin:18px 0 8px;text-transform:uppercase;letter-spacing:.5px}
+.sensor-row{display:flex;gap:8px;flex-wrap:wrap}
+.chip{padding:10px 18px;border-radius:8px;border:1px solid var(--border);background:var(--card);cursor:pointer;font-size:14px;color:var(--text);transition:.15s}
+.chip:hover{border-color:var(--accent)}
+.chip.on{background:#1f3a5f;border-color:var(--accent);color:#fff;font-weight:600}
+.chip .tag{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px}
+.chip .tag.r{background:#f85149}.chip .tag.l{background:#58a6ff}
+.chip{display:inline-flex;align-items:center;gap:2px}
+.chip .cname{margin:0 2px}
+.chip-btn{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:4px;font-size:13px;line-height:1;color:var(--muted);opacity:.55;transition:.12s}
+.chip-btn:hover{background:#30363d;color:var(--text);opacity:1}
+.chip-btn.del:hover{background:#4a1f1f;color:var(--red)}
+/* 方案Tab */
+.tabs{display:flex;gap:6px;margin-top:18px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.tab{padding:10px 20px;cursor:pointer;color:var(--muted);font-size:14px;border-bottom:2px solid transparent;margin-bottom:-1px;position:relative}
+.tab:hover{color:var(--text)}
+.tab.on{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
+.tab.best::after{content:"";position:absolute;left:10px;right:10px;bottom:-5px;height:3px;border-radius:2px;background:var(--red)}
+.rec-note{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:14px;font-size:12px;color:var(--muted)}
+.rec-note b{color:var(--red);font-size:13px}
+.rec-badge{padding:2px 8px;border-radius:10px;border:1px solid var(--border);background:var(--card2);white-space:nowrap}
+.rec-badge.ok{color:var(--green);border-color:#1f4426;background:#12231a}
+.rec-badge.no{color:var(--red);border-color:#5a2a2a;background:#2a1a1a}
+/* 参数卡 */
+.param-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;margin-top:16px;display:flex;gap:20px;flex-wrap:wrap;align-items:center}
+.pl{font-size:30px;font-weight:700;color:var(--accent);width:28px}
+.pgrid{display:grid;grid-template-columns:repeat(3,minmax(120px,1fr));gap:10px;flex:1;min-width:280px}
+.pitem{background:var(--card2);border-radius:8px;padding:8px 12px}
+.pitem .k{font-size:12px;color:var(--muted)}
+.pitem .v{font-size:17px;font-family:Consolas,monospace;margin-top:2px}
+.pinput{width:100%;background:var(--card2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:Consolas,monospace;font-size:15px;padding:5px 8px;outline:none}
+.pinput:focus{border-color:var(--accent)}
+.copy-btn{padding:10px 20px;border-radius:8px;border:none;background:var(--accent);color:#0d1117;font-weight:600;cursor:pointer;font-size:14px}
+.copy-btn:active{transform:scale(.97)}
+.copy-btn.ghost{background:transparent;border:1px solid var(--border);color:var(--muted)}
+/* 上传区 */
+.upload-card{background:var(--card);border:1px dashed #3b4351;border-radius:12px;padding:18px;margin-bottom:8px}
+.upload-card h3{font-size:14px;margin-bottom:10px;color:var(--accent)}
+.file-list{display:flex;flex-direction:column;gap:6px;margin:10px 0}
+.file-item{display:flex;align-items:center;gap:10px;background:var(--card2);border-radius:6px;padding:7px 12px;font-size:13px}
+.file-item input[type=radio]{accent-color:var(--accent)}
+.side-row{display:flex;gap:14px;align-items:center;font-size:13px;margin:8px 0;flex-wrap:wrap}
+.side-row label{cursor:pointer;display:flex;align-items:center;gap:5px}
+.side-row input[type=radio]{accent-color:var(--accent)}
+.run-btn{padding:10px 26px;border-radius:8px;border:none;background:var(--green);color:#0d1117;font-weight:700;cursor:pointer;font-size:14px;margin-right:10px}
+.run-btn:disabled{opacity:.4;cursor:not-allowed}
+.fit-log{font-size:12px;color:var(--muted);margin-top:10px;font-family:Consolas,monospace;white-space:pre-wrap}
+.drop-hint{border:1px dashed var(--border);border-radius:8px;padding:16px;text-align:center;color:var(--muted);font-size:13px;cursor:pointer;transition:.15s}
+.drop-hint:hover{border-color:var(--accent);color:var(--accent)}
+/* 汇总 */
+.sum-row{display:flex;gap:12px;margin-top:16px;flex-wrap:wrap}
+.sum-card{flex:1;min-width:150px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px}
+.sum-card .t{font-size:12px;color:var(--muted)}
+.sum-card .n{font-size:24px;font-weight:700;margin-top:4px}
+.sum-card .d{font-size:12px;margin-top:2px}
+.good{color:var(--green)}.bad{color:var(--red)}
+/* 图 */
+.chart-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px;margin-top:16px}
+.chart-card h3{font-size:14px;font-weight:600;margin-bottom:12px}
+.legend{display:flex;gap:16px;font-size:12px;color:var(--muted);margin-bottom:8px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+canvas{width:100%;display:block}
+/* 原理按钮+模态 */
+.doc-btn{margin-top:16px;padding:10px 20px;border-radius:8px;border:1px solid var(--purple);background:transparent;color:var(--purple);cursor:pointer;font-size:14px}
+.doc-btn:hover{background:#251f33}
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:50;padding:40px 20px;overflow-y:auto}
+.modal-bg.show{display:block}
+.modal{max-width:760px;margin:0 auto;background:var(--card);border:1px solid var(--border);border-radius:14px;padding:28px;position:relative}
+.modal h2{font-size:18px;margin-bottom:14px;color:var(--purple)}
+.modal h3{font-size:14px;margin:18px 0 8px;color:var(--accent)}
+.modal p,.modal li{font-size:13.5px;line-height:1.8;color:var(--text)}
+.modal ol,.modal ul{padding-left:22px}
+.modal .close{position:absolute;top:14px;right:18px;font-size:22px;cursor:pointer;color:var(--muted)}
+.formula{background:#0d1117;border:1px solid var(--border);border-radius:8px;padding:14px 18px;margin:10px 0;font-family:Cambria,Georgia,serif;font-size:16px;text-align:center;letter-spacing:.5px}
+.formula sub,.formula sup{font-size:11px}
+code.inline{background:var(--card2);padding:2px 6px;border-radius:4px;font-family:Consolas,monospace;font-size:12.5px;color:var(--orange)}
+table.mini{border-collapse:collapse;width:100%;margin:8px 0;font-size:12.5px}
+table.mini th,table.mini td{border:1px solid var(--border);padding:5px 10px;text-align:center}
+table.mini th{background:var(--card2);color:var(--muted);font-weight:500}
+
+/* ===== app shell / device page ===== */
+body{padding:0}
+.appbar{display:flex;align-items:center;gap:16px;padding:10px 22px;background:#161b22;border-bottom:1px solid #2d333b;position:sticky;top:0;z-index:30}
+.appbar .brand{font-weight:700;font-size:16px;letter-spacing:.3px}
+.appbar .brand small{color:#8b949e;font-weight:400;font-size:12px;margin-left:8px}
+.app-tabs{display:flex;gap:6px;margin-left:auto}
+.app-tab{padding:8px 20px;border-radius:8px;border:1px solid #2d333b;background:#1c2129;color:#8b949e;cursor:pointer;font-size:14px}
+.app-tab.on{background:#1f3a5f;border-color:#58a6ff;color:#fff;font-weight:600}
+.page{display:none}.page.active{display:block}
+.page>.wrap{padding:18px 24px 36px}
+.wrap.wide{max-width:1520px}
+.devgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.dev-card{background:#161b22;border:1px solid #2d333b;border-radius:12px;padding:16px 18px;min-width:0}
+.dev-card.span2{grid-column:1/-1}
+.dev-card h3{font-size:14px;color:#58a6ff;margin-bottom:12px;font-weight:600}
+.dev-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:8px 0;font-size:13px}
+.dev-row label{color:#8b949e;min-width:58px}
+.dev-row input:not([type]),.dev-row input[type=text],.dev-row select{background:#0d1117;border:1px solid #2d333b;border-radius:6px;color:#e6edf3;padding:6px 9px;font-family:Consolas,monospace;font-size:13px;min-width:120px;outline:none}
+.dev-row input:focus,.dev-row select:focus{border-color:#58a6ff}
+.dev-btn{padding:7px 14px;border-radius:7px;border:1px solid #2d333b;background:#1c2129;color:#e6edf3;cursor:pointer;font-size:13px}
+.dev-btn:hover{border-color:#58a6ff}
+.dev-btn.primary{background:#1f6feb;border-color:#1f6feb;color:#fff;font-weight:600}
+.dev-btn.ghost{background:transparent;color:#8b949e}
+.dev-btn:disabled{opacity:.4;cursor:not-allowed}
+.press-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.dev-note{font-size:12px;color:#8b949e;margin-top:8px;min-height:16px;font-family:Consolas,monospace;white-space:pre-wrap}
+.pill{display:inline-block;width:8px;height:8px;border-radius:50%;background:#484f58;margin-right:6px;vertical-align:0}
+.pill.on{background:#3fb950}
+.chan-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:6px 12px;margin-top:10px}
+.chan-grid label{display:flex;align-items:center;gap:8px;color:#8b949e;font-size:12px}
+.chan-grid input{flex:1;background:#0d1117;border:1px solid #2d333b;border-radius:5px;color:#e6edf3;padding:4px 7px;font-family:Consolas,monospace;font-size:12px;min-width:0}
+.file-row{display:flex;gap:8px;align-items:center;margin:5px 0}
+.file-row span{width:52px;color:#8b949e;font-size:12px;flex:none}
+.file-row input{flex:1;background:#0d1117;border:1px solid #2d333b;border-radius:6px;color:#e6edf3;padding:6px 9px;font-size:12px;min-width:0}
+.par-grid{display:grid;grid-template-columns:repeat(14,minmax(0,1fr));gap:6px;align-items:center;margin:10px 0}
+.par-grid label{color:#8b949e;font-size:12px;text-align:right}
+.par-grid input{background:#0d1117;border:1px solid #2d333b;border-radius:5px;color:#e6edf3;padding:5px 7px;font-family:Consolas,monospace;font-size:12px;min-width:0;width:100%}
+.par-grid .dev-btn{padding:6px 8px;font-size:12px;white-space:nowrap}
+.par-grid.verify input{color:#bc8cff}
+.calc-empty{background:#161b22;border:1px dashed #3b4351;border-radius:12px;padding:26px;text-align:center;color:#8b949e;font-size:14px;margin-top:18px}
+#toast{position:fixed;right:24px;bottom:24px;background:#1f6feb;color:#fff;padding:10px 18px;border-radius:8px;font-size:13px;opacity:0;transform:translateY(8px);transition:.2s;z-index:100;pointer-events:none}
+#toast.show{opacity:1;transform:none}
+@media(max-width:1280px){.devgrid{grid-template-columns:1fr}.dev-card.span2{grid-column:auto}.par-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+
+</style>
+</head>
+<body>
+<header class="appbar"><div class="brand">GAPSENSE S2 标定软件<small>标定采集 + 参数计算</small></div><div class="app-tabs"><button class="app-tab on" data-page="device">标定采集</button><button class="app-tab" data-page="calc">参数计算</button></div></header>
+
+<section id="page-device" class="page active">
+ <div class="wrap wide">
+  <div class="devgrid">
+   <div class="dev-card">
+    <h3>压力机</h3>
+    <div class="dev-row"><label>IP</label><input id="ipInput" value="192.168.1.200"><button id="btnTcp" class="dev-btn primary">连接压力机</button></div>
+    <div class="dev-row"><label>压力值/N</label><input id="pressureView" readonly></div>
+    <div class="dev-row">
+      <button class="dev-btn" data-tcp="init">初始化参数</button>
+      <button class="dev-btn" data-tcp="test">测试</button>
+      <button class="dev-btn" data-tcp="stop_home">测试停止并回位</button>
+      <button class="dev-btn" data-tcp="stop">停止</button>
+    </div>
+    <div class="press-grid">
+      <button class="dev-btn press" data-press="0">0N</button>
+      <button class="dev-btn press" data-press="50">50N</button>
+      <button class="dev-btn press" data-press="100">100N</button>
+      <button class="dev-btn press" data-press="150">150N</button>
+      <button class="dev-btn press" data-press="200">200N</button>
+      <button class="dev-btn press" data-press="250">250N</button>
+    </div>
+    <div class="dev-note" id="tcpState"><span class="pill"></span>未连接</div>
+   </div>
+   <div class="dev-card">
+    <h3>蓝牙串口</h3>
+    <div class="dev-row"><select id="portSelect"></select><button id="btnRefresh" class="dev-btn">刷新</button><button id="btnSerial" class="dev-btn primary">连接蓝牙</button></div>
+    <div class="dev-row"><button id="btnLog" class="dev-btn">导出数据</button><button id="btnStopLog" class="dev-btn">结束导出</button><button id="btnOpenLog" class="dev-btn ghost">打开文件夹</button></div>
+    <div class="dev-note" id="serialState"><span class="pill"></span>未连接</div>
+    <div class="chan-grid">
+      <label>chl_0<input id="ch0" readonly></label><label>chl_4<input id="ch4" readonly></label>
+      <label>chl_1<input id="ch1" readonly></label><label>chl_5<input id="ch5" readonly></label>
+      <label>chl_2<input id="ch2" readonly></label><label>chl_6<input id="ch6" readonly></label>
+      <label>chl_3<input id="ch3" readonly></label><label>chl_7<input id="ch7" readonly></label>
+    </div>
+    <div class="dev-row"><label>左侧GAP</label><input id="leftGap" readonly><label>右侧GAP</label><input id="rightGap" readonly><button id="btnZero" class="dev-btn">清零</button></div>
+   </div>
+   <div class="dev-card span2">
+    <h3>res-pressure</h3>
+    <canvas id="rtChart" height="260" style="width:100%;display:block"></canvas>
+   </div>
+   <div class="dev-card span2">
+    <h3>GAPSENSE-RES</h3>
+    <div class="file-row"><span>偏心1</span><input id="csv0" readonly placeholder="选择 CSV"><button class="dev-btn" data-file="0">打开</button></div>
+    <div class="file-row"><span>偏心2</span><input id="csv1" readonly placeholder="选择 CSV"><button class="dev-btn" data-file="1">打开</button></div>
+    <div class="file-row"><span>偏心3</span><input id="csv2" readonly placeholder="选择 CSV"><button class="dev-btn" data-file="2">打开</button></div>
+    <div class="file-row"><span>偏心4</span><input id="csv3" readonly placeholder="选择 CSV"><button class="dev-btn" data-file="3">打开</button></div>
+    <div class="file-row"><span>中心</span><input id="csv4" readonly placeholder="选择 CSV"><button class="dev-btn" data-file="4">打开</button></div>
+    <div class="dev-row">
+      <label>方向</label>
+      <label><input type="radio" name="devSide" value="1"> 左侧</label>
+      <label><input type="radio" name="devSide" value="5" checked> 右侧</label>
+      <span style="color:#8b949e;font-size:12px">写完参数后可用「验证参数」回读</span>
+    </div>
+    <div class="par-grid">
+      <label>A</label><input id="fwA"><label>B</label><input id="fwB"><label>C</label><input id="fwC">
+      <label>D</label><input id="fwD"><label>E</label><input id="fwE"><label>F</label><input id="fwF">
+      <button id="btnGetParams" class="dev-btn">获取参数</button>
+      <button id="btnGetComp" class="dev-btn">获取补偿参数</button>
+      <button id="btnWriteParams" class="dev-btn primary">写参数</button>
+      <button id="btnVerifyParams" class="dev-btn">验证参数</button>
+    </div>
+    <div class="dev-row">
+      <button class="dev-btn" data-g="G01">G01</button>
+      <button class="dev-btn" data-g="G02">G02</button>
+      <button class="dev-btn" data-g="G03">G03</button>
+      <input id="devName" readonly placeholder="传感器名称">
+      <button id="btnVerifyName" class="dev-btn">名称验证</button>
+      <button id="btnPowerOff" class="dev-btn">关机</button>
+    </div>
+    <div class="par-grid verify">
+      <label>A</label><input id="vA" readonly><label>B</label><input id="vB" readonly><label>C</label><input id="vC" readonly>
+      <label>D</label><input id="vD" readonly><label>E</label><input id="vE" readonly><label>F</label><input id="vF" readonly>
+    </div>
+    <div class="dev-note" id="devMsg"></div>
+   </div>
+  </div>
+ </div>
+</section>
+<section id="page-calc" class="page">
+<div class="wrap">
+  <h1>标定参数计算器</h1>
+  <div class="sub">公式：P = A·ch1 + B·ch2 + C·ch3 + D·ch4 − E·P² − F·P ｜ 本版在 8x线性版基础上增加「文件体检」：上传即显示每通道幅度、自动识别无信号文件与无信号侧别</div>
+
+  <div class="upload-card">
+    <h3>📤 上传自定义传感器标定数据（5 个 CSV：4 个偏心 + 1 个中心）</h3>
+    <div class="drop-hint" onclick="pickCsvFiles()">
+      点击选择 5 个 CSV 标定文件（与标定软件导出格式一致，列0=真实压力）
+    </div>
+    <input type="file" id="fileInput" multiple accept=".csv" style="display:none">
+    <div class="side-row">
+      通道方向：
+      <label><input type="radio" name="side" value="1"> 左侧（列1-4）</label>
+      <label><input type="radio" name="side" value="5" checked> 右侧（列5-8）</label>
+      <label style="margin-left:10px"><input type="checkbox" id="autoDrop" checked> 自动剔除无信号文件后继续拟合</label>
+    </div>
+    <div class="file-list" id="fileList"></div>
+    <button class="run-btn" id="runBtn" onclick="runCustomFit()" disabled>开始拟合并添加</button>
+    <span style="font-size:12px;color:var(--muted)">在文件列表中勾选一个作为<b style="color:var(--accent)">中心点文件</b></span>
+    <div class="fit-log" id="fitLog"></div>
+  </div>
+
+  <div id="calcEmpty" class="calc-empty">尚未添加传感器。请先选择 5 个 CSV（4 个偏心 + 1 个中心），拟合完成后这里会显示全部方案。</div>
+  <div id="calcMain" style="display:none">
+  <div class="sec-title">① 选择传感器（左/右）</div>
+  <div class="sensor-row" id="sensorRow"></div>
+
+  <div class="sec-title">② 选择拟合方案</div>
+  <div class="tabs" id="tabs"></div>
+  <div class="rec-note" id="recNote"></div>
+
+  <div class="param-card">
+    <div class="pl">Σ</div>
+    <div class="pgrid" id="pgrid"></div>
+    <button class="copy-btn" onclick="copyParams()">复制参数</button>
+    <button class="copy-btn ghost" onclick="fillToDevice()">填入写参数 &rarr;</button>
+  </div>
+
+  <div class="sum-row" id="sumRow"></div>
+
+  <div class="chart-card">
+    <h3>中心点误差 — 10N 分段 RMS（20N 起 · <span id="cmpName"></span> vs S1）</h3>
+    <div class="legend"><span><i style="background:#58a6ff"></i>当前方案</span><span><i style="background:#484f58"></i>S1 基准</span><span><i style="background:#d29922;height:2px;width:14px"></i>容差上限</span></div>
+    <canvas id="cChart" height="230"></canvas>
+  </div>
+
+  <div class="chart-card">
+    <h3>偏心点误差 — 10N 分段 RMS（4 个偏心位置平均）</h3>
+    <div class="legend"><span><i style="background:#bc8cff"></i>当前方案</span><span><i style="background:#484f58"></i>S1 基准</span></div>
+    <canvas id="eChart" height="200"></canvas>
+  </div>
+
+  <button class="doc-btn" onclick="showDoc()">📄 查看本方案拟合原理与公式</button>
+  </div>
+</div>
+
+<div class="modal-bg" id="modalBg" onclick="if(event.target===this)hideDoc()">
+  <div class="modal">
+    <span class="close" onclick="hideDoc()">×</span>
+    <div id="docBody"></div>
+  </div>
+</div>
+
+</section>
+<div id="toast"></div>
+<script>
+
+/* ===================== device page ===================== */
+const DEV={plotting:false,x:Array.from({length:8},()=>[]),y:[],lastRx:-1,state:null,drawTimer:null};
+const CH_COLORS=["#58a6ff","#3fb950","#d29922","#bc8cff","#f85149","#39c5cf","#db6d28","#a5d6ff"];
+function pyApi(){return (window.pywebview&&window.pywebview.api)?window.pywebview.api:null;}
+async function callApi(name,...args){
+  const api=pyApi();
+  if(!api||!api[name])return null;
+  try{return await api[name](...args);}catch(e){console.error(name,e);return null;}
+}
+function numText(v){return (v===undefined||v===null||v==="")?"":String(v);}
+function toast(msg){const t=document.getElementById("toast");t.textContent=msg;t.classList.add("show");clearTimeout(toast._t);toast._t=setTimeout(()=>t.classList.remove("show"),1800);}
+function switchPage(p){
+  document.querySelectorAll(".page").forEach(el=>el.classList.toggle("active",el.id==="page-"+p));
+  document.querySelectorAll(".app-tab").forEach(el=>el.classList.toggle("on",el.dataset.page===p));
+  if(p==="calc"&&typeof render==="function")setTimeout(()=>{try{render();}catch(e){console.error(e);}},30);
+  if(p==="device")setTimeout(drawRt,30);
+}
+function devSide(){return parseInt((document.querySelector("input[name=devSide]:checked")||{value:5}).value);}
+
+async function refreshPorts(){
+  const ports=await callApi("list_ports")||[];
+  const sel=document.getElementById("portSelect");
+  const old=sel.value;
+  sel.innerHTML=ports.map(p=>`<option value="${p.device}">${p.device}${p.description?"  "+p.description:""}</option>`).join("");
+  if(old&&ports.some(p=>p.device===old))sel.value=old;
+}
+
+function showVerify(){
+  const key=devSide()===1?"left":"right";
+  const v=(DEV.state&&DEV.state.verify&&DEV.state.verify[key])||{};
+  ["A","B","C","D","E","F"].forEach(k=>{const el=document.getElementById("v"+k);if(el)el.value=numText(v[k]);});
+}
+
+function applyState(s){
+  DEV.state=s;
+  const tcp=document.getElementById("tcpState");
+  tcp.innerHTML=`<span class="pill ${s.tcp_connected?"on":""}"></span>`+(s.tcp_connected?"压力机已连接":"未连接");
+  const ser=document.getElementById("serialState");
+  ser.innerHTML=`<span class="pill ${s.serial_open?"on":""}"></span>`+(s.serial_open?("串口已连接 "+s.serial_port):"未连接")+(s.log_active?"  · 正在导出":"");
+  document.getElementById("btnTcp").textContent=s.tcp_connected?"断开压力机":"连接压力机";
+  document.getElementById("btnSerial").textContent=s.serial_open?"断开蓝牙":"连接蓝牙";
+  document.getElementById("pressureView").value=s.tcp_connected?s.pressure.toFixed(2):"";
+  for(let i=0;i<8;i++){const el=document.getElementById("ch"+i);if(el&&document.activeElement!==el)el.value=numText(s.channels[i]);}
+  const lg=document.getElementById("leftGap"),rg=document.getElementById("rightGap");
+  if(document.activeElement!==lg)lg.value=Number(s.left||0).toFixed(2);
+  if(document.activeElement!==rg)rg.value=Number(s.right||0).toFixed(2);
+  const dn=document.getElementById("devName");
+  if(document.activeElement!==dn)dn.value=s.name||"";
+  document.getElementById("devMsg").textContent=s.last_msg||"";
+  const radio=document.querySelector(`input[name=devSide][value="${s.active_side}"]`);
+  if(radio&&!radio.checked)radio.checked=true;
+  showVerify();
+  if(s.serial_rx!==DEV.lastRx){
+    DEV.lastRx=s.serial_rx;
+    for(let i=0;i<8;i++){DEV.x[i].push(s.channels[i]||0);if(DEV.x[i].length>3000)DEV.x[i].shift();}
+    DEV.y.push(s.pressure||0);if(DEV.y.length>3000)DEV.y.shift();
+    if(DEV.plotting)requestDraw();
+  }
+}
+
+async function pollState(){const s=await callApi("get_state");if(s)applyState(s);}
+
+function requestDraw(){if(DEV.drawTimer)return;DEV.drawTimer=setTimeout(()=>{DEV.drawTimer=null;drawRt();},500);}
+function drawRt(){
+  const cv=document.getElementById("rtChart");
+  if(!cv)return;
+  const W=cv.width=Math.max(320,cv.clientWidth||800), H=cv.height=260;
+  const ctx=cv.getContext("2d");
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle="#0d1117";ctx.fillRect(0,0,W,H);
+  const pad={l:48,r:12,t:22,b:26};
+  if(!DEV.y.length){
+    ctx.fillStyle="#8b949e";ctx.font="13px Segoe UI";ctx.fillText("等待串口数据…",pad.l,pad.t+20);
+    return;
+  }
+  let xmin=Infinity,xmax=-Infinity,ymax=0;
+  for(let i=0;i<8;i++)for(const v of DEV.x[i]){if(v<xmin)xmin=v;if(v>xmax)xmax=v;}
+  for(const v of DEV.y)if(v>ymax)ymax=v;
+  if(!(xmax>xmin)){xmax=xmin+1;}
+  if(!(ymax>0))ymax=1;
+  ctx.strokeStyle="#21262d";ctx.fillStyle="#8b949e";ctx.font="11px Consolas";
+  for(let g=0;g<=4;g++){
+    const y=pad.t+(H-pad.t-pad.b)*g/4;
+    ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(W-pad.r,y);ctx.stroke();
+    ctx.fillText((ymax*(4-g)/4).toFixed(0),6,y+4);
+  }
+  const N=DEV.y.length;
+  const mx=v=>pad.l+(v-xmin)/(xmax-xmin)*(W-pad.l-pad.r);
+  const my=v=>H-pad.b-(v/ymax)*(H-pad.t-pad.b);
+  for(let j=0;j<8;j++){
+    const xs=DEV.x[j];const n=Math.min(N,xs.length);
+    ctx.strokeStyle=CH_COLORS[j];ctx.lineWidth=1.4;ctx.beginPath();
+    for(let i=0;i<n;i++){const px=mx(xs[i]),py=my(DEV.y[i]);if(i===0)ctx.moveTo(px,py);else ctx.lineTo(px,py);}
+    ctx.stroke();
+  }
+  ctx.font="11px Consolas";
+  for(let j=0;j<8;j++){const lx=pad.l+j*64,ly=14;ctx.fillStyle=CH_COLORS[j];ctx.fillRect(lx,ly-8,10,10);ctx.fillStyle="#8b949e";ctx.fillText("chl"+j,lx+14,ly+1);}
+}
+
+function clearPlot(){for(let i=0;i<8;i++)DEV.x[i]=[];DEV.y=[];DEV.lastRx=-1;drawRt();}
+
+function bindDevice(){
+  document.querySelectorAll(".app-tab").forEach(el=>el.onclick=()=>switchPage(el.dataset.page));
+  document.getElementById("btnRefresh").onclick=refreshPorts;
+  document.getElementById("btnTcp").onclick=async()=>{
+    const s=DEV.state;
+    if(s&&s.tcp_connected)await callApi("disconnect_tcp");
+    else await callApi("connect_tcp",document.getElementById("ipInput").value.trim());
+    pollState();
+  };
+  document.getElementById("btnSerial").onclick=async()=>{
+    const s=DEV.state;
+    if(s&&s.serial_open)await callApi("disconnect_serial");
+    else{
+      const port=document.getElementById("portSelect").value;
+      if(!port){toast("未发现串口");return;}
+      await callApi("connect_serial",port);
+    }
+    pollState();
+  };
+  document.getElementById("btnZero").onclick=async()=>{
+    const r=await callApi("zero_now");
+    if(r&&r.ok)toast("已清零：当前空载 = 0N");else toast((r&&r.error)||"清零失败");
+    pollState();
+  };
+  document.querySelectorAll("[data-tcp]").forEach(b=>b.onclick=async()=>{
+    const cmd=b.dataset.tcp;
+    if(cmd==="test"){clearPlot();DEV.plotting=true;}
+    if(cmd==="stop_home"||cmd==="stop")DEV.plotting=false;
+    await callApi("tcp_command",cmd);
+    pollState();
+  });
+  document.querySelectorAll("[data-press]").forEach(b=>b.onclick=async()=>{
+    const n=parseInt(b.dataset.press);
+    if(n===0){toast("0N 不下发指令");return;}
+    await callApi("tcp_command","pressure",n);
+  });
+  document.getElementById("btnLog").onclick=async()=>{
+    const r=await callApi("start_log");
+    if(r&&r.ok)toast("开始导出："+r.path);else toast("开始导出失败");
+    pollState();
+  };
+  document.getElementById("btnStopLog").onclick=async()=>{await callApi("stop_log");pollState();};
+  document.getElementById("btnOpenLog").onclick=()=>callApi("open_log_folder");
+
+  document.querySelectorAll("input[name=devSide]").forEach(r=>r.onchange=async()=>{
+    await callApi("set_side",devSide());showVerify();
+  });
+
+  document.querySelectorAll("[data-file]").forEach(b=>b.onclick=async()=>{
+    const i=parseInt(b.dataset.file);
+    const paths=await callApi("pick_files");
+    if(paths&&paths.length){DEV.csv=DEV.csv||[];DEV.csv[i]=paths[0];document.getElementById("csv"+i).value=paths[0];}
+  });
+
+  document.getElementById("btnGetParams").onclick=async()=>{
+    const side=devSide();
+    const ks=[];
+    for(let i=0;i<4;i++){
+      const p=(DEV.csv||[])[i]||document.getElementById("csv"+i).value;
+      if(!p){toast("先选择偏心"+(i+1)+"的 CSV");return;}
+      const r=await callApi("read_text",p);
+      if(!r||!r.ok){toast("读取失败："+p);return;}
+      const kv=await callApi("get_k",parseCSV(r.text),side);
+      if(!kv||!kv.ok){toast("该方向数据无效，请检查左侧/右侧");return;}
+      ks.push(kv.value);
+    }
+    if(ks.some(v=>!Number.isFinite(v))){toast("该方向数据无效，请检查左侧/右侧");return;}
+    ["A","B","C","D"].forEach((k,i)=>document.getElementById("fw"+k).value=String(ks[i]));
+    document.getElementById("fwE").value="0";
+    document.getElementById("fwF").value="0";
+    toast("已获取 A~D，E/F 置 0");
+  };
+
+  document.getElementById("btnGetComp").onclick=async()=>{
+    const p=(DEV.csv||[])[4]||document.getElementById("csv4").value;
+    if(!p){toast("先选择中心 CSV");return;}
+    const r=await callApi("read_text",p);
+    if(!r||!r.ok){toast("读取失败："+p);return;}
+    const ef=calibrationPar(parseCSV(r.text),devSide());
+    if(!ef){toast("中心文件缺少压力列或数据不足");return;}
+    document.getElementById("fwE").value=String(ef[0]);
+    document.getElementById("fwF").value=String(ef[1]);
+    toast("已获取补偿参数 E/F");
+  };
+
+  document.getElementById("btnWriteParams").onclick=async()=>{
+    const s=DEV.state;
+    if(!s||!s.serial_open){toast("串口未连接");return;}
+    const vals=["A","B","C","D","E","F"].map(k=>document.getElementById("fw"+k).value.trim());
+    if(vals.some(v=>v==="")){toast("A~F 不能为空");return;}
+    const r=await callApi("serial_write_params",devSide(),vals);
+    toast(r&&r.ok?"写参数已发送":"写参数失败");
+    pollState();
+  };
+  document.getElementById("btnVerifyParams").onclick=async()=>{
+    await callApi("serial_command","read");toast("已发送验证命令");
+  };
+  document.getElementById("btnVerifyName").onclick=async()=>{
+    await callApi("serial_command","name");toast("已发送名称验证");
+  };
+  document.querySelectorAll("[data-g]").forEach(b=>b.onclick=async()=>{
+    await callApi("serial_command","g",b.dataset.g);toast("已发送 "+b.dataset.g);
+  });
+  document.getElementById("btnPowerOff").onclick=async()=>{
+    await callApi("serial_command","shutdown");toast("已发送关机命令");
+  };
+  window.addEventListener("resize",()=>{if(document.getElementById("page-device").classList.contains("active"))drawRt();});
+}
+
+function calibrationPar(rows,clum){
+  const col=clum===1?9:10;
+  let rs=0,re=rows.length;
+  for(let i=0;i<rows.length-2;i++){if(rows[i][0]>0&&rows[i+1][0]>0&&rows[i+2][0]>0){rs=i;break;}}
+  for(let i=0;i<rows.length;i++){if(rows[i][0]>200){re=i;break;}}
+  let s11=0,s12=0,s22=0,b1=0,b2=0,n=0;
+  for(let i=rs;i<re;i++){
+    const p=rows[i][col];if(!Number.isFinite(p))continue;
+    const err=p-rows[i][0],p2=p*p;
+    s11+=p2*p2;s12+=p2*p;s22+=p2;b1+=p2*err;b2+=p*err;n++;
+  }
+  if(n<10)return null;
+  const det=s11*s22-s12*s12;
+  if(!(Math.abs(det)>1e-24))return null;
+  return [(b1*s22-b2*s12)/det,(s11*b2-s12*b1)/det];
+}
+
+function deviceApplyParams(side,p){
+  const radio=document.querySelector(`input[name=devSide][value="${side}"]`);
+  if(radio){radio.checked=true;}
+  callApi("set_side",side);
+  ["A","B","C","D","E","F"].forEach((k,i)=>{document.getElementById("fw"+k).value=numText(p[i]);});
+  document.getElementById("devMsg").textContent="已填入计算器参数，请点击「写参数」下发（方向："+(side===1?"左侧":"右侧")+"）";
+  toast("参数已填入 GAPSENSE-RES");
+}
+
+document.addEventListener("DOMContentLoaded",()=>{
+  bindDevice();
+  refreshPorts();
+  pollState();
+  setInterval(pollState,100);
+});
+
+/* ===================== calculator (from 容错版) ===================== */
+
+const DATA = {"_order": [], "_tol": [3, 3, 3, 3.45, 4.3, 5.1, 5.83, 6.51, 7.13, 7.68, 8.18, 8.63, 9.01, 9.33, 9.6, 9.8, 9.95, 10.04, 10.07, 10.04, 10.25, 10.75]};
+
+const SENSORS = [];
+const SCHEMES = ["S1","S2联合","S2中心8x","S2容差优先","S2中心优先","S2中心16x+高压4x","S2中心16x+高压4x（线性版）","S2中心8x+高压4x（线性版）","自定义"];
+let curS = null, curM = "S2中心16x+高压4x";
+const TOL = DATA["_tol"];
+
+const sensorRow = document.getElementById("sensorRow");
+const customSet=new Set();   // 用户上传新增的传感器
+function rebuildSensors(){
+  sensorRow.innerHTML="";
+  SENSORS.forEach(s=>{
+    const d=document.createElement("div");
+    d.className="chip"+(s===curS?" on":"");
+    d.innerHTML=`<span class="tag ${s.endsWith("左")?"l":"r"}"></span><span class="cname">${s}</span>`;
+    if(customSet.has(s)){
+      const ed=document.createElement("span");
+      ed.className="chip-btn";ed.textContent="✎";ed.title="重命名";
+      ed.onclick=e=>{e.stopPropagation();renameSensor(s);};
+      const dl=document.createElement("span");
+      dl.className="chip-btn del";dl.textContent="×";dl.title="删除";
+      dl.onclick=e=>{e.stopPropagation();deleteSensor(s);};
+      d.appendChild(ed);d.appendChild(dl);
+    }
+    d.onclick=()=>{curS=s;document.querySelectorAll("#sensorRow .chip").forEach(c=>c.classList.remove("on"));d.classList.add("on");render();};
+    sensorRow.appendChild(d);
+  });
+}
+function deleteSensor(name){
+  if(!confirm("删除传感器「"+name+"」？\n只从当前页面移除，不影响其它传感器。"))return;
+  delete DATA[name];
+  if(DATA["_raw"])delete DATA["_raw"][name];
+  const i=SENSORS.indexOf(name);if(i>=0)SENSORS.splice(i,1);
+  const j=DATA["_order"].indexOf(name);if(j>=0)DATA["_order"].splice(j,1);
+  customSet.delete(name);
+  if(!SENSORS.length){curS=null;rebuildSensors();showCalcEmpty();return;}
+  if(curS===name)curS=SENSORS[0];
+  rebuildSensors();render();
+}
+function renameSensor(oldName){
+  const nn=(prompt("输入新名称：",oldName)||"").trim();
+  if(!nn||nn===oldName)return;
+  if(SENSORS.includes(nn)){alert("名称「"+nn+"」已存在");return;}
+  DATA[nn]=DATA[oldName];delete DATA[oldName];
+  if(DATA["_raw"]&&DATA["_raw"][oldName]){DATA["_raw"][nn]=DATA["_raw"][oldName];delete DATA["_raw"][oldName];}
+  const i=SENSORS.indexOf(oldName);if(i>=0)SENSORS[i]=nn;
+  const j=DATA["_order"].indexOf(oldName);if(j>=0)DATA["_order"][j]=nn;
+  customSet.delete(oldName);customSet.add(nn);
+  if(curS===oldName)curS=nn;
+  rebuildSensors();render();
+}
+rebuildSensors();
+
+const tabs=document.getElementById("tabs");
+SCHEMES.forEach(m=>{
+  const d=document.createElement("div");
+  d.className="tab"+(m===curM?" on":"");
+  d.textContent=m;
+  d.dataset.scheme=m;
+  d.onclick=()=>{curM=m;document.querySelectorAll("#tabs .tab").forEach(c=>c.classList.remove("on"));d.classList.add("on");render();};
+  tabs.appendChild(d);
+});
+
+function fmt(v){return (v>=0?"":"")+v.toFixed(8).replace(/0+$/,"").replace(/\.$/,".0");}
+
+/* raw数据: 每组5文件(4偏心+center最后), 每行[p,ch1..ch4], 已扣零已截段 */
+function getRaw(name){return DATA["_raw"] && DATA["_raw"][name] ? DATA["_raw"][name] : (DATA[name] && DATA[name]._raw ? DATA[name]._raw : null);}
+function rawErr(rows,params){
+  return rows.map(r=>{
+    const t=params[0]*r[1]+params[1]*r[2]+params[2]*r[3]+params[3]*r[4];
+    return r[0]-(t-params[4]*t*t-params[5]*t);
+  });
+}
+function rawSegRMS(rows,params){
+  const rp=rows.map(r=>r[0]), err=rawErr(rows,params);
+  return segRMSfromArrays(rp,err);
+}
+function segRMSfromArrays(rp,err){
+  const segs=[];
+  for(let lo=0;lo<220;lo+=10){
+    const vals=[];
+    for(let i=0;i<rp.length;i++)if(rp[i]>=lo&&rp[i]<lo+10)vals.push(err[i]);
+    segs.push(vals.length?Math.round(Math.sqrt(vals.reduce((s,v)=>s+v*v,0)/vals.length)*100)/100:null);
+  }
+  return segs;
+}
+function getCurParams(){
+  if(!curS||!DATA[curS])return [0,0,0,0,0,0];
+  if(curM==='自定义'){
+    const def=DATA[curS]["S2容差优先"].params;
+    return [0,1,2,3,4,5].map(i=>{const v=parseFloat((document.getElementById("cp"+i)||{}).value);return isNaN(v)?def[i]:v;});
+  }
+  return DATA[curS][curM].params;
+}
+function render(){
+  if(!curS||!DATA[curS]||!DATA[curS]["S1"]){showCalcEmpty();return;}
+  const main=document.getElementById("calcMain");if(main)main.style.display="";
+  const empty=document.getElementById("calcEmpty");if(empty)empty.style.display="none";
+  const S1=DATA[curS]["S1"];
+  const names=["A","B","C","D","E","F"];
+  const isCustom=curM==='自定义';
+  let D;
+  if(isCustom){
+    D=calcCustom();
+    const cur=getCurParams(), def=DATA[curS]["S2容差优先"].params;
+    document.getElementById("pgrid").innerHTML=names.map((n,i)=>
+      `<div class="pitem"><div class="k">${n}</div><div class="v"><input class="pinput" id="cp${i}" value="${cur[i]||''}" placeholder="${def[i]}" oninput="onCustomInput()"></div></div>`).join("");
+  }else{
+    D=DATA[curS][curM];
+    document.getElementById("pgrid").innerHTML=names.map((n,i)=>
+      `<div class="pitem"><div class="k">${n}</div><div class="v">${D.params[i]}</div></div>`).join("");
+  }
+  document.getElementById("cmpName").textContent=curM;
+
+  // 汇总
+  const d1=D.center_rms-S1.center_rms, d2=D.ecc_rms-S1.ecc_rms;
+  const hp=i=>D.center_segs[i], s1hp=i=>S1.center_segs[i];
+  const d190=hp(19)-s1hp(19);
+  document.getElementById("sumRow").innerHTML=[
+    {t:"中心点 RMS",n:D.center_rms+" N",d:(d1<=0?"比S1好 "+Math.abs(d1).toFixed(2):"比S1差 "+d1.toFixed(2))+" N",cls:d1<=0},
+    {t:"中心 190~200N",n:hp(19)+" N",d:(d190<=0?"比S1好 "+Math.abs(d190).toFixed(2):"比S1差 "+d190.toFixed(2)+" N"),cls:d190<=0},
+    {t:"偏心点 RMS",n:D.ecc_rms+" N",d:(d2<=0?"比S1好 "+Math.abs(d2).toFixed(2):"比S1差 "+d2.toFixed(2))+" N",cls:d2<=0},
+    {t:"中心最大段误差",n:Math.max(...D.center_segs)+" N",d:"出现在 "+(D.center_segs.indexOf(Math.max(...D.center_segs))*10)+"~"+(D.center_segs.indexOf(Math.max(...D.center_segs))*10+10)+"N",cls:Math.max(...D.center_segs)<=5}
+  ].map(c=>`<div class="sum-card"><div class="t">${c.t}</div><div class="n">${c.n}</div><div class="d ${c.cls?"good":"bad"}">${c.d}</div></div>`).join("");
+
+  drawChart("cChart",D.center_segs,S1.center_segs,isCustom?null:TOL,"#58a6ff",2);
+  drawChart("eChart",D.ecc_segs,S1.ecc_segs,TOL,"#bc8cff");
+  updateRecUI();
+}
+
+function calcCustom(){
+  const params=getCurParams();
+  const raw=getRaw(curS);
+  if(!raw)return{params,center_segs:new Array(22).fill(null),center_rms:0,ecc_segs:new Array(22).fill(null),ecc_rms:0};
+  const center=raw[raw.length-1];
+  const cErr=rawErr(center,params);
+  const cSeg=segRMSfromArrays(center.map(r=>r[0]),cErr);
+  const eErrs=raw.slice(0,raw.length-1).map(f=>rawErr(f,params));
+  const eRmsList=eErrs.map(e=>Math.sqrt(e.reduce((s,v)=>s+v*v,0)/e.length));
+  const eSegsAll=eErrs.map((e,i)=>segRMSfromArrays(raw[i].map(r=>r[0]),e));
+  const eccSegs=[];
+  for(let i=0;i<22;i++){
+    const vals=eSegsAll.map(x=>x[i]).filter(v=>v!==null);
+    eccSegs.push(vals.length?Math.round(vals.reduce((a,b)=>a+b,0)/vals.length*100)/100:null);
+  }
+  return{
+    params,
+    center_segs:cSeg,
+    center_rms:Math.round(Math.sqrt(cErr.reduce((s,v)=>s+v*v,0)/cErr.length)*100)/100,
+    ecc_segs:eccSegs,
+    ecc_rms:Math.round(eRmsList.reduce((a,b)=>a+b,0)/eRmsList.length*100)/100
+  };
+}
+let customTimer=null;
+function onCustomInput(){
+  clearTimeout(customTimer);
+  customTimer=setTimeout(()=>{calcCustomAndRedraw();},200);
+}
+function calcCustomAndRedraw(){
+  const S1=DATA[curS]["S1"];
+  const D=calcCustom();
+  const d1=D.center_rms-S1.center_rms, d2=D.ecc_rms-S1.ecc_rms;
+  const d190=D.center_segs[19]-S1.center_segs[19];
+  document.getElementById("sumRow").innerHTML=[
+    {t:"中心点 RMS",n:D.center_rms+" N",d:(d1<=0?"比S1好 "+Math.abs(d1).toFixed(2):"比S1差 "+d1.toFixed(2))+" N",cls:d1<=0},
+    {t:"中心 190~200N",n:D.center_segs[19]+" N",d:(d190<=0?"比S1好 "+Math.abs(d190).toFixed(2):"比S1差 "+d190.toFixed(2)+" N"),cls:d190<=0},
+    {t:"偏心点 RMS",n:D.ecc_rms+" N",d:(d2<=0?"比S1好 "+Math.abs(d2).toFixed(2):"比S1差 "+d2.toFixed(2))+" N",cls:d2<=0},
+    {t:"中心最大段误差",n:Math.max(...D.center_segs)+" N",d:"出现在 "+(D.center_segs.indexOf(Math.max(...D.center_segs))*10)+"~"+(D.center_segs.indexOf(Math.max(...D.center_segs))*10+10)+"N",cls:Math.max(...D.center_segs)<=5}
+  ].map(c=>`<div class="sum-card"><div class="t">${c.t}</div><div class="n">${c.n}</div><div class="d ${c.cls?"good":"bad"}">${c.d}</div></div>`).join("");
+  drawChart("cChart",D.center_segs,S1.center_segs,TOL,"#58a6ff",2);
+  drawChart("eChart",D.ecc_segs,S1.ecc_segs,TOL,"#bc8cff");
+}
+
+function drawChart(id,cur,base,tol,color,startSeg){
+  startSeg=startSeg||0;
+  if(startSeg){cur=cur.slice(startSeg);base=base.slice(startSeg);if(tol)tol=tol.slice(startSeg);}
+  const cv=document.getElementById(id),ctx=cv.getContext("2d");
+  const W=cv.width=cv.offsetWidth*2,H=cv.height;
+  ctx.scale(1,1);
+  const pad={l:50,r:10,t:14,b:26},n=cur.length;
+  const maxV=Math.max(...cur,...base,...(tol||[0]))*1.12;
+  const cw=(W-pad.l-pad.r)/n;
+  ctx.clearRect(0,0,W,H);
+  // 网格
+  ctx.strokeStyle="#21262d";ctx.fillStyle="#8b949e";ctx.font="18px Segoe UI";ctx.lineWidth=1;
+  for(let g=0;g<=4;g++){
+    const y=pad.t+(H-pad.t-pad.b)*g/4;
+    ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(W-pad.r,y);ctx.stroke();
+    ctx.fillText((maxV*(4-g)/4).toFixed(0),8,y+5);
+  }
+  for(let i=0;i<n;i++){
+    const x0=pad.l+i*cw;
+    if(i%2===0){ctx.fillText((i+startSeg)*10,x0+2,H-6);}
+    const bh=(H-pad.t-pad.b)*base[i]/maxV;
+    ctx.fillStyle="#484f58";ctx.fillRect(x0+cw*0.12,H-pad.b-bh,cw*0.32,bh);
+    const ch=(H-pad.t-pad.b)*cur[i]/maxV;
+    ctx.fillStyle=color;ctx.fillRect(x0+cw*0.5,H-pad.b-ch,cw*0.32,ch);
+    if(tol){
+      const ty=H-pad.b-(H-pad.t-pad.b)*tol[i]/maxV;
+      ctx.strokeStyle="#d29922";ctx.lineWidth=2;ctx.setLineDash([6,4]);
+      ctx.beginPath();ctx.moveTo(x0+cw*0.08,ty);ctx.lineTo(x0+cw*0.92,ty);ctx.stroke();ctx.setLineDash([]);
+    }
+  }
+  ctx.strokeStyle="#2d333b";ctx.beginPath();ctx.moveTo(pad.l,H-pad.b);ctx.lineTo(W-pad.r,H-pad.b);ctx.stroke();
+}
+
+/* ===== 自动推荐：按四条验收需求给当前传感器选方案 ===== */
+const REC_WEIGHT={"S2联合":1,"S2中心8x":8,"S2容差优先":8,"S2中心16x+高压4x":16,"S2中心16x+高压4x（线性版）":16,"S2中心8x+高压4x（线性版）":8};
+const REC_SCHEMES=Object.keys(REC_WEIGHT);
+const recCache={};
+function rawMet(rows,params){
+  const err=rawErr(rows,params);
+  const segs=segRMSfromArrays(rows.map(r=>r[0]),err);
+  let sr=0,hn=0,hs=0;
+  rows.forEach((r,i)=>{sr+=err[i]*err[i];if(r[0]>=150){hn++;hs+=err[i]*err[i];}});
+  return {segs,rms:Math.sqrt(sr/rows.length),hp:hn?Math.sqrt(hs/hn):0};
+}
+function evalRec(name,m){
+  const raw=getRaw(name),D=DATA[name]&&DATA[name][m];
+  if(!raw||!D||!D.params)return null;
+  const P=D.params;
+  const center=rawMet(raw[raw.length-1],P);
+  const ecc=raw.slice(0,raw.length-1).map(r=>rawMet(r,P));
+  let mx=0;
+  [center.segs,...ecc.map(e=>e.segs)].forEach(sg=>{
+    for(let i=3;i<=19;i++)if(sg[i]!==null&&sg[i]!==undefined&&TOL[i])mx=Math.max(mx,sg[i]/TOL[i]);
+  });
+  return {m,center,ecc,mx};
+}
+function recommend(name){
+  if(recCache[name])return recCache[name];
+  const s1=evalRec(name,"S1");
+  if(!s1)return null;
+  const s1ehp=s1.ecc.reduce((s,v)=>s+v.hp,0)/s1.ecc.length;
+  const cands=REC_SCHEMES.filter(m=>REC_WEIGHT[m]<=16).map(m=>evalRec(name,m)).filter(Boolean).map(x=>{
+    const beats=x.ecc.filter((e,i)=>e.rms<s1.ecc[i].rms).length;
+    const ehp=x.ecc.reduce((s,v)=>s+v.hp,0)/x.ecc.length;
+    const ok1=x.mx<=1.0;
+    const ok2=(s1.center.hp-x.center.hp)/s1.center.hp>=0.10 && (s1ehp-ehp)/s1ehp>=0.10;
+    const ok3=x.center.rms<s1.center.rms && beats===4;
+    const ok4=REC_WEIGHT[x.m]<=16;
+    return {...x,beats,ok1,ok2,ok3,ok4,centerBetter:x.center.rms<s1.center.rms,
+            pass:(ok1?1:0)+(ok2?1:0)+(ok3?1:0)+(ok4?1:0)};
+  }).sort((a,b)=>b.pass-a.pass||(b.centerBetter-a.centerBetter)||(b.beats-a.beats)||(a.mx-b.mx)||(a.center.rms-b.center.rms));
+  const rec={name,cands,best:cands[0],s1};
+  recCache[name]=rec;
+  return rec;
+}
+function updateRecUI(){
+  const rec=recommend(curS);
+  document.querySelectorAll("#tabs .tab").forEach(t=>{
+    const isBest=!!rec&&t.dataset.scheme===rec.best.m;
+    t.classList.toggle("best",isBest);
+    t.title=isBest?"按四条验收需求自动推荐":"";
+  });
+  const el=document.getElementById("recNote");
+  if(!rec){el.innerHTML="";return;}
+  const b=rec.best;
+  const c3txt=b.ok3?"✓":(b.centerBetter?b.beats+"/4 台偏心更优":"中心差于S1");
+  el.innerHTML=`<span title="①容差 ②高压 ③中心+偏心 ④中心权重≤16：先比满足条数，再比中心/偏心是否优于S1，最后比最差容差比">自动推荐：<b>${b.m}</b></span>`+
+    `<span class="rec-badge ${b.ok1?"ok":"no"}" title="30~200N 每 10N 分段 RMS / 容差的最大值">① 容差 ${b.ok1?"✓":"✗ "+b.mx.toFixed(2)+"×"}</span>`+
+    `<span class="rec-badge ${b.ok2?"ok":"no"}" title="中心与 4 个偏心文件的 150N 以上 RMS 均比 S1 好 10% 以上">② 高压优于S1 ${b.ok2?"✓":"✗"}</span>`+
+    `<span class="rec-badge ${b.ok3?"ok":"no"}" title="中心 RMS 低于 S1，且 4 个偏心文件逐台低于 S1">③ 中心+偏心 ${c3txt}</span>`+
+    `<span class="rec-badge ok">④ 中心 ${REC_WEIGHT[b.m]}x ✓</span>`+
+    `<span style="opacity:.85">最差 误差/容差 ${b.mx.toFixed(2)}× ｜ 中心 ${b.center.rms.toFixed(2)}N（S1 ${rec.s1.center.rms.toFixed(2)}N）</span>`;
+}
+
+function copyParams(){
+  const names=["A","B","C","D","E","F"];
+  const txt=names.map((n,i)=>`${n} = ${getCurParams()[i]}`).join("\n");
+  const b=document.querySelector(".copy-btn");
+  const done=()=>{b.textContent="已复制 ✓";setTimeout(()=>b.textContent="复制参数",1200);};
+  const fallback=()=>{
+    // 本地 file:// 或老浏览器无 clipboard API 时降级
+    const ta=document.createElement("textarea");
+    ta.value=txt;ta.style.position="fixed";ta.style.opacity="0";
+    document.body.appendChild(ta);ta.select();
+    let ok=false;
+    try{ok=document.execCommand("copy");}catch(e){ok=false;}
+    document.body.removeChild(ta);
+    if(ok){done();}
+    else{b.textContent="复制失败，请手动选中";setTimeout(()=>b.textContent="复制参数",2000);}
+  };
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(done).catch(fallback);
+  }else{fallback();}
+}
+
+/* ===== 拟合原理文档 ===== */
+const COMMON_HEAD=`
+<h3>共同的传感器实时公式</h3>
+<div class="formula">P = A·ch<sub>1</sub> + B·ch<sub>2</sub> + C·ch<sub>3</sub> + D·ch<sub>4</sub> − E·P² − F·P</div>
+<p>其中 temp = A·ch<sub>1</sub>+B·ch<sub>2</sub>+C·ch<sub>3</sub>+D·ch<sub>4</sub>（固件用 temp 求 E、F 项，非 P），四个 ch 为惠斯通电桥应变通道电压。A、B、C、D 是四通道一次权重（量纲 N/V），E、F 是非线性补偿项。<b>六个方案公式完全相同，区别只在参数怎么解出来。</b></p>
+<h3>统一的优化框架（加权最小二乘）</h3>
+<div class="formula">min&nbsp; Σ<sub>i</sub>&nbsp; w<sub>i</sub> · [ P<sub>model</sub>(ch<sub>1i</sub>…ch<sub>4i</sub>; θ) − P<sub>true,i</sub> ]²&nbsp;&nbsp;&nbsp; θ = (A,B,C,D,E,F)</div>
+<p>权重 w<sub>i</sub> 决定优化器"在乎"哪些数据点。方案差异 = 权重分配 + 初值/求解方式。所有 S2 方案采用 <b>ABCD ↔ EF 分步交替迭代</b>求解（固定 EF 解 ABCD → 固定 ABCD 解 EF → 循环到收敛），并施加边界约束 <code class="inline">0.6k ≤ A,B,C,D ≤ 1.4k</code>（k 为 S1 单通道 k 均值）防止权重飘成极端负值导致实测发散。</p>`;
+
+const ALT_HEAD=COMMON_HEAD+`
+<h3>交替迭代（块坐标下降）</h3>
+<p><b>不是一次联合求解，而是两块轮流优化，直到不再变化：</b></p>
+<ol>
+<li><b>固定 E/F，解 A/B/C/D</b>：各点 P<sub>model</sub> 对 t 是二次函数，用 Gauss-Newton 迭代 + 边界裁剪求 4 个通道权重；</li>
+<li><b>固定 A/B/C/D，解 E/F</b>：令 t = A·ch<sub>1</sub>+…+D·ch<sub>4</sub>，残差 r = t−P 对 (E,F) 是<b>线性</b>的，直接用加权线性最小二乘解；</li>
+<li>比较两块参数的变化量，小于 1e-12 即停，否则回到第 1 步。</li>
+</ol>
+<p>用户说的"S2 联合：5 个文件一起交替优化 a~d 和 e~f 直到收敛"就是本方案。</p>
+<h3>和"联合求解"的关系</h3>
+<p>联合求解（其余 S2 方案）是把 6 个参数扔进同一个 TRF 一次解完，相当于所有方向同时下降；交替迭代则是分块下降。<b>两者收敛到的是不同的点</b>：交替迭代会被 ABCD 的边界卡住，停在"任何单独一块都动不了、但两块同时动还能更好"的角点上。</p>
+<h3>实测结论（6 台）</h3>
+<p>交替迭代的<b>中心点误差略好或相当，偏心点系统性变差</b>，因为 ABCD 触边界后无法与 E/F 协同调整。典型：小号左 交替中心8x 偏心 5.30N vs 联合 2.56N；大号右 交替容差 6.48N vs 4.75N。</p>
+<p><b>建议</b>：把交替迭代当作<b>验证手段</b>——它能证明联合解已足够好；实际生产用联合求解。</p>`;
+
+const DOCS={
+"S1":COMMON_HEAD+`
+<h3>S1 — 标定软件实际方案</h3>
+<p><b>两步解耦求解，与标定软件 v1.2.7 内部逻辑一致：</b></p>
+<ol>
+<li><b>第一步求 A,B,C,D</b>：每个标定文件单独做一元线性回归，得到单通道 k<sub>m</sub>（0~220.5N 全程），再对四个文件取 k 均值，令 A=B=C=D=k̄（等权重假设）。</li>
+<li><b>第二步求 E,F</b>：固定 ABCD，计算残差 g<sub>i</sub> = P<sub>pred</sub> − P<sub>true</sub>，对 E、F 做二元线性最小二乘（只使用 0~200N 数据，因为软件只在这个范围标定 E、F）：</li>
+</ol>
+<div class="formula">g ≈ E·t² + F·t&nbsp;&nbsp;(t = k̄·Σch)，二次曲线拟合残差</div>
+<p><b>特点</b>：中心 0~200N 内很准（软件按此优化），但 200N 以上 E、F 无数据支撑、外推发散（210~220N 误差可达 5~8N）；偏心位置因四通道等权重无法补偿不均匀受力，高压偏心误差 9~13N。</p>`,
+
+"S2联合":COMMON_HEAD+`
+<h3>S2 联合 — 全局等权 + 交替迭代</h3>
+<p><b>5 个文件等权，ABCD ↔ EF 分步交替迭代：</b></p>
+<ol>
+<li>5 个标定文件（4 偏心 + 1 中心）的数据 <b>合并成一个数据集</b>，每个点权重 w<sub>i</sub> = 1。</li>
+<li><b>固定 E/F，Gauss-Newton 解 A/B/C/D</b>；再<b>固定 A/B/C/D，加权线性最小二乘解 E/F</b>；循环到参数变化 &lt; 1e-12。</li>
+<li>初值取 S1 解（k̄,k̄,k̄,k̄,E₀,F₀），边界约束 0.6k~1.4k。</li>
+</ol>
+<div class="formula">min&nbsp; Σ<sub>5个文件</sub> Σ<sub>i</sub> [ A·ch<sub>1</sub>+B·ch<sub>2</sub>+C·ch<sub>3</sub>+D·ch<sub>4</sub> − E·P²−F·P − P<sub>true</sub> ]²</div>
+<p><b>特点</b>：偏心点 RMS 从 S1 的 5.5~7.4N 降到 2.5~3.6N（核心收益：四通道权重不再相等，能补偿偏心受力）。代价是中心点中段（100~180N）误差升到 2~3N，因为优化器被大量偏心点"平均"了注意力。</p>`,
+
+"S2中心8x":COMMON_HEAD+`
+<h3>S2中心8x（中心权重 ×8）+ 交替迭代</h3>
+<p>在 S2 联合基础上改权重：<b>中心文件每个数据点的权重 ×8</b>，偏心文件保持 1。求解方式同为 <b>ABCD ↔ EF 分步交替迭代</b>。</p>
+<div class="formula">w<sub>i</sub> = 8 × 𝟙[中心文件] + 1 × 𝟙[偏心文件]</div>
+<p><b>特点</b>：中心 RMS 优于 S2联合，200N 以上仍显著好于 S1；偏心高压段比 S2联合略差。适合以中心按压为主要使用场景。</p>`,
+
+"S2容差优先":COMMON_HEAD+`
+<h3>S2容差优先（当前推荐）</h3>
+<p><b>核心思想：按你定义的"可接受误差曲线"反推每个点的权重。</b></p>
+<h3>容差曲线（线性插值 10% → 5%）</h3>
+<div class="formula">tol(P) = P × [ 10% − 5% × (P−10) / 190 ]，&nbsp;&nbsp;P ∈ [10, 200]N</div>
+<div class="formula">tol(10N)=1.0N&nbsp;&nbsp; tol(55N)=4.1N(7.5%)&nbsp;&nbsp; tol(200N)=10N(5%)</div>
+<p>200N 以上保持 5% 斜率外推；10N 以下固定 10%。</p>
+<h3>权重 = 容差平方的倒数</h3>
+<div class="formula">w(P) = 1 / tol(P)²&nbsp;&nbsp;→&nbsp;&nbsp; w(10N)≈1.0，w(100N)≈0.018，w(200N)≈0.010</div>
+<p><b>为什么是平方</b>：若误差 ~ 高斯分布、容差是置信上限，则残差方差应与 tol² 成正比，马氏距离意义下的"归一化残差"就是 err/tol，最小化 Σ(err/tol)² 等价于把每个点"超标概率"均衡化——即所谓 chi-square 拟合。中心文件权重再整体 ×8。</p>
+<h3>迭代流程（ABCD ↔ EF 交替）</h3>
+<ol>
+<li>k 均值初值 → S1 式求解 E、F 初值；</li>
+<li>固定 E/F 解 A/B/C/D（Gauss-Newton），固定 A/B/C/D 解 E/F（加权线性最小二乘），循环到收敛；</li>
+<li>边界约束 0.6k ≤ ABCD ≤ 1.4k（防过拟合、防实测发散）；</li>
+<li>验证：输出每段 误差/容差 比值，目标全部 &lt; 1（10~200N 实际最大 0.69）。</li>
+</ol>
+<p><b>特点</b>：低压段 RMS 0.3~0.9N（解决低压超差），全程 10~200N 在容差线内；中心 190~200N 仍优于 S1。参数温和（0.04~0.09），实测泛化风险最低。唯一代价：200~220N 逼近容差上限（比值 0.89~1.11）。</p>`,
+
+"S2中心优先":COMMON_HEAD+`
+<h3>S2中心优先（等权 + 中心 32x）— 交替迭代求解</h3>
+<p><b>目标：在不改公式的前提下，把中心点精度做到全面优于 S1。</b></p>
+<ol>
+<li><b>取消S2容差优先</b>：所有点权重取 1（不再用 1/tol²）。</li>
+<li><b>中心文件整体 ×32</b>：中心点占损失权重 32/(4+32) ≈ 89%。</li>
+<li><b>放宽 ABCD 边界</b>：从 0.6k~1.4k 放宽到 <b>0.3k~3.0k</b>。</li>
+<li><b>求解方式</b>：ABCD ↔ EF 分步交替迭代（固定 EF 解 ABCD → 固定 ABCD 解 EF → 循环到收敛）。</li>
+</ol>
+<div class="formula">min&nbsp; 32·Σ<sub>中心</sub>[err]² + 1·Σ<sub>偏心</sub>[err]²，&nbsp;&nbsp;0.3k ≤ A,B,C,D ≤ 3.0k</div>
+<p><b>代价</b>：等权不照顾"低压容差只有 1N"，低压段误差/容差比值偏高；中心 RMS 与低压达标率在本模型下互斥。</p>`,
+
+"S2中心16x+高压4x":COMMON_HEAD+`
+<h3>S2中心16x+高压4x — 按四条验收要求设计的交替迭代方案</h3>
+<p><b>四条需求：① 30~200N 误差 3N~10N 均匀 ② 高压比 S1 好 ③ 中心点优先且偏心比 S1 好 ④ 中心权重 ≤16 倍。</b></p>
+<h3>1. 容差曲线（30N→3N，200N→10N）</h3>
+<div class="formula">tol(P) = P × [ 10% − 5% × (P−30) / 170 ]，&nbsp;&nbsp;P ∈ [30, 200]N</div>
+<p>30N 处容差 3N（10%），200N 处容差 10N（5%），线性过渡。权重 = 1/tol²。</p>
+<h3>2. 逐通道归一化（不做四通道求和）</h3>
+<p>每个通道除以自己的量程 range<sub>j</sub>，得到 0~1 无量纲数：</p>
+<div class="formula">c̃<sub>j</sub> = ch<sub>j</sub> / range<sub>j</sub>，&nbsp;&nbsp;t = B̃₁·c̃₁ + B̃₂·c̃₂ + B̃₃·c̃₃ + B̃₄·c̃₄</div>
+<p>起点 B̃ = 55N（满量程均分四片），边界 20~200N（绝对物理量，不依赖 k̄）。<b>全程不做"四通道加一起求 k"。</b></p>
+<h3>3. 中心 16x + 高压 4x 加权</h3>
+<div class="formula">w = 1/tol² × (中心 ? 16 : 1) × (P≥150N ? 4 : 1)</div>
+<p>中心权重 16 倍（满足 ≤16 约束），150N 以上再 ×4 压高压段误差。</p>
+<h3>4. 交替迭代求解（ABCD ↔ EF）</h3>
+<ol>
+<li>固定 E/F，Gauss-Newton 解 A/B/C/D（逐通道，边界裁剪）；</li>
+<li>固定 A/B/C/D，加权线性最小二乘解 E/F；</li>
+<li>参数变化 &lt; 1e-12 即停，否则回到第 1 步。</li>
+</ol>
+<h3>回代公式</h3>
+<div class="formula">A<sub>j</sub> = B̃<sub>j</sub> / range<sub>j</sub>&nbsp;&nbsp;（归一化系数换回 APP 要的 N/V 系数）</div>
+<p><b>特点</b>：无求和 + S2容差优先 + 中心16x + 高压4x + 交替迭代。G 盘 6 台数据全部达标（30~200N max ≤0.79）。</p>`,
+
+"S2中心16x+高压4x（线性版）":COMMON_HEAD+`
+<h3>S2中心16x+高压4x（线性版）— 高压权重线性递增</h3>
+<p>与「S2中心16x+高压4x」唯一区别：<b>高压权重从固定 ×4 改成线性递增</b>。</p>
+<div class="formula">hw(P) = 1 + 3 × (P−150)/70，&nbsp;&nbsp;P ∈ [150, 220]N</div>
+<p>150N 处高压权重 = 1（不额外加权），220N 处 = 4，中间线性过渡；150N 以下 = 1，220N 以上 = 4。其余（归一化、容差30~200N、中心16x、交替迭代）完全一致。</p>
+<div class="formula">w = 1/tol² × (中心 ? 16 : 1) × hw(P)</div>
+<p><b>目的</b>：避免 150N 处权重突然跳变，让高压加权更平滑。</p>`,
+
+"S2中心8x+高压4x（线性版）":COMMON_HEAD+`
+<h3>S2中心8x+高压4x（线性版）— 中心 8x + 高压线性递增</h3>
+<p>与「S2中心16x+高压4x（线性版）」唯一区别：<b>中心权重从 16 降到 8</b>。归一化、容差 30~200N、高压线性权重、边界 20~200 全部一致。</p>
+<div class="formula">w = 1/tol² × (中心 ? 8 : 1) × [1 + 3×(P−150)/70]<sub>P∈[150,220]</sub></div>
+<p>中心占比 8/(4+8) ≈ 67%（16x 为 80%），同时满足验收需求④「中心权重 ≤16 倍」。</p>
+<p><b>实测（8 台，归一化框架内）</b>：相对 16x 线性版，偏心 RMS 4.88 vs 5.08、最差台 9.54 vs 9.70、max(err/容差) 2.07 vs 2.09，中心 RMS 2.49 vs 2.38。即以 0.11N 的中心代价换 0.2N 的偏心收益，属于「偏心优先」的折中档。</p>`,
+
+"交替联合":ALT_HEAD+`
+<p><b>本页配置</b>：5 个文件等权（w=1），ABCD 边界 0.6k~1.4k。<br>
+对应联合求解的「S2联合」，可直接在两页签之间切换对比。</p>`,
+"交替中心8x":ALT_HEAD+`
+<p><b>本页配置</b>：中心文件权重 ×8，偏心 ×1，ABCD 边界 0.6k~1.4k。<br>
+对应联合求解的「S2中心8x」。</p>`,
+"交替中心优先":ALT_HEAD+`
+<p><b>本页配置</b>：5 个文件等权（w=1），<b>中心文件 ×32</b>，ABCD 边界放宽到 <b>0.3k̄~3.0k̄</b>。<br>
+对应联合求解的「S2中心优先」。</p>
+<p><b>实测</b>：中心 RMS 与联合解接近（小号右 1.59 vs 1.76、中号左 1.41 vs 1.48、大号右/大号左 完全相同），但偏心 RMS 更差（小号左 5.76 vs 2.54）——放宽边界后交替更容易卡在角点。</p>`,
+
+"交替容差":ALT_HEAD+`
+<p><b>本页配置</b>：按S2容差优先 w=1/tol²，中心再 ×8，ABCD 边界 0.6k~1.4k。<br>
+对应联合求解的「S2容差优先」。</p>`,
+
+"自定义":COMMON_HEAD+`
+<h3>自定义 — 手动输入参数，实时看误差</h3>
+<p>本方案不做拟合：<b>六个输入框由你手动填写任意 ABCDEF</b>，页面基于当前传感器的原始标定数据（5 个文件、已扣零、有效段）实时计算：</p>
+<ul>
+<li><b>中心点误差</b>：中心文件逐点计算 P<sub>model</sub>，与真实压力作差，按 10N 分段 RMS 统计；</li>
+<li><b>偏心点误差</b>：4 个偏心文件同样计算后取各段平均；</li>
+<li>汇总卡对比 S1 基准，图表实时刷新（输入后约 0.2 秒防抖触发）。</li>
+</ul>
+<div class="formula">err<sub>i</sub> = P<sub>true,i</sub> − [ t<sub>i</sub> − E·t<sub>i</sub>² − F·t<sub>i</sub> ]，&nbsp;&nbsp;t<sub>i</sub> = A·ch<sub>1i</sub>+B·ch<sub>2i</sub>+C·ch<sub>3i</sub>+D·ch<sub>4i</sub></div>
+<p><b>用途</b>：微调预置方案的参数（比如观察 E、F 对高压段的影响）、验证你自己迭代出的参数、或做敏感性分析。输入框留空时按S2容差优先参数计算。上传的新传感器同样支持本方案（拟合时已同时保存原始数据）。</p>`
+};
+
+function showDoc(){document.getElementById("docBody").innerHTML=DOCS[curM];document.getElementById("modalBg").classList.add("show");}
+function hideDoc(){document.getElementById("modalBg").classList.remove("show");}
+
+function showCalcEmpty(){
+  const main=document.getElementById("calcMain"),empty=document.getElementById("calcEmpty");
+  if(main)main.style.display="none";
+  if(empty)empty.style.display="";
+}
+function fillToDevice(){
+  if(!curS||!DATA[curS])return;
+  const p=getCurParams();
+  const side=DATA[curS]._side||parseInt((document.querySelector('input[name=devSide]:checked')||{value:1}).value);
+  if(window.deviceApplyParams){window.deviceApplyParams(parseInt(side),p);switchPage("device");}
+}
+
+/* ================= 自定义传感器拟合引擎 ================= */
+function parseCSV(text){
+  const rows=[];
+  text.split(/\r?\n/).forEach(line=>{
+    const parts=line.trim().split(',');
+    if(parts.length<6 || parts[0]==='') return;
+    const nums=parts.map(Number);
+    if(nums.some(isNaN)) return;
+    rows.push(nums);
+  });
+  return rows;
+}
+function getRange(rows,endThresh){
+  let rs=0,re=rows.length-1;
+  for(let i=0;i<rows.length-2;i++){
+    if(rows[i][0]>0&&rows[i+1][0]>0&&rows[i+2][0]>0){rs=i;break;}
+  }
+  for(let i=0;i<rows.length;i++){
+    if(rows[i][0]>endThresh){re=i;break;}
+  }
+  return [rs,re];
+}
+function getChannels(rows,clum){
+  const [rs,re]=getRange(rows,220.5);
+  const rp=rows.slice(rs,re).map(r=>r[0]);
+  const chs=[0,1,2,3].map(j=>rows.map(r=>r[clum+j]));
+  chs.forEach(ch=>{
+    const z=ch[0];
+    for(let i=0;i<ch.length;i++)ch[i]-=z;
+  });
+  return {rp, chs:chs.map(ch=>ch.slice(rs,re))};
+}
+// 模型: t = A*c1+B*c2+C*c3+D*c4 ; P = t - E*t^2 - F*t
+function model(params,c1,c2,c3,c4){
+  const [a,b,c,d,e,f]=params;
+  const t=a*c1+b*c2+c*c3+d*c4;
+  return t-e*t*t-f*t;
+}
+// —— 上传处理 ——
+let customFiles=[];
+const SPAN_MIN=20; // 判定"无信号"的幅度下限(counts)
+function activeSide(){return parseInt(document.querySelector('input[name=side]:checked').value);}
+function fileDiag(rows){
+  const out={};
+  for(const side of [1,5]){
+    const [rs,re]=getRange(rows,220.5);
+    const sp=[];
+    for(let j=0;j<4;j++){
+      let mn=Infinity,mx=-Infinity;
+      for(let i=rs;i<re;i++){const v=rows[i][side+j];if(v<mn)mn=v;if(v>mx)mx=v;}
+      sp.push(re>rs?Math.round(mx-mn):0);
+    }
+    out[side]={rs,re,sp};
+  }
+  return out;
+}
+function isDead(f,clum){
+  if(!f.diag)return false;
+  return Math.max(...f.diag[clum].sp)<SPAN_MIN;
+}
+function sideMedian(clum){
+  const v=customFiles.map(f=>Math.max(...f.diag[clum].sp)).sort((a,b)=>a-b);
+  return v.length?v[Math.floor(v.length/2)]:0;
+}
+async function loadCsvTexts(items){
+  customFiles=[];
+  const list=document.getElementById("fileList");
+  list.innerHTML="";
+  for(const f of items){
+    const rows=parseCSV(f.text||"");
+    customFiles.push({name:f.name,rows,center:false,diag:fileDiag(rows)});
+  }
+  if(customFiles.length){
+    const dead=s=>customFiles.filter(f=>isDead(f,s)).length;
+    const cur=activeSide(),other=cur===1?5:1;
+    const mCur=sideMedian(cur),mOther=sideMedian(other);
+    if((dead(cur)>0&&dead(other)===0)||(mOther>=SPAN_MIN&&mOther>=mCur*5)){
+      document.querySelector(`input[name=side][value="${other}"]`).checked=true;
+      log("⚠ 当前方向信号微弱："+(cur===1?"左侧":"右侧")+"幅度中位 "+mCur+" counts，"+(other===1?"左侧":"右侧")+" "+mOther+" counts，已自动切换到"+(other===1?"左侧（B~E）":"右侧（F~I）"));
+    }
+  }
+  renderFileList();
+  document.getElementById("runBtn").disabled=customFiles.length!==5;
+  if(customFiles.length!==5)log("请选择 5 个 CSV 文件（当前 "+customFiles.length+" 个）");
+}
+document.getElementById("fileInput").addEventListener("change",async ev=>{
+  const items=[];
+  for(const f of ev.target.files)items.push({name:f.name,text:await f.text()});
+  loadCsvTexts(items);
+});
+async function pickCsvFiles(){
+  const api=window.pywebview&&window.pywebview.api;
+  if(!api||!api.pick_files){document.getElementById("fileInput").click();return;}
+  const paths=await api.pick_files();
+  if(!paths||!paths.length)return;
+  const items=[];
+  for(const p of paths){
+    const r=await api.read_text(p);
+    items.push({name:p.replace(/^.*[\/]/,""),text:r&&r.ok?r.text:""});
+  }
+  loadCsvTexts(items);
+}
+document.querySelectorAll('input[name=side]').forEach(r=>r.addEventListener("change",()=>{
+  renderFileList();
+  if(customFiles.length)log("已切换通道方向："+(activeSide()===1?"左侧（B~E）":"右侧（F~I）")+"，下方幅度按当前方向统计");
+}));
+function renderFileList(){
+  const clum=activeSide();
+  if(customFiles.length===5){
+    const valid=customFiles.map((_,i)=>i).filter(i=>!isDead(customFiles[i],clum));
+    const cur=customFiles.findIndex(f=>f.center);
+    if(valid.length&&(cur<0||!valid.includes(cur))){
+      customFiles.forEach(x=>x.center=false);
+      customFiles[valid[valid.length-1]].center=true;
+      if(cur>=0){
+        const prev=document.getElementById("fitLog").textContent;
+        log((prev?prev+"\n":"")+"⚠ 中心文件 "+customFiles[cur].name+" 在"+(clum===1?"左侧":"右侧")+"无信号，中心已改选为 "+customFiles[valid[valid.length-1]].name);
+      }
+    }
+  }
+  const list=document.getElementById("fileList");
+  list.innerHTML="";
+  customFiles.forEach((f,i)=>{
+    const d=f.diag?f.diag[clum]:null;
+    const other=f.diag?f.diag[clum===1?5:1]:null;
+    const dead=isDead(f,clum),weak=d?d.sp.some(v=>v<SPAN_MIN):false;
+    const div=document.createElement("div");
+    div.className="file-item";
+    div.innerHTML=`<input type="radio" name="cfile" ${f.center?"checked":""} onchange="customFiles.forEach(x=>x.center=false);customFiles[${i}].center=true;renderFileList();">
+      <span>${f.name}</span>
+      <span style="color:var(--muted);margin-left:auto;text-align:right;line-height:1.5">
+        ${f.rows.length} 行 · 有效 ${d?d.rs+"–"+d.re:"?"}（${d?d.re-d.rs:0} 点）<br>
+        ${clum===1?"左 B~E":"右 F~I"} Δ <span style="color:${dead?"var(--red)":(weak?"var(--orange)":"var(--green)")}">${d?d.sp.join(" / "):"?"}</span>
+        ${dead?" · <b style='color:var(--red)'>无信号</b>":(weak?" · <b style='color:var(--orange)'>有通道静默</b>":"")}
+        ｜ 另一侧最大 Δ ${other?Math.max(...other.sp):"?"}
+        ${f.center?" · <b style='color:var(--accent)'>中心</b>":""}
+      </span>`;
+    list.appendChild(div);
+  });
+}
+function log(msg){document.getElementById("fitLog").textContent=msg;}
+function runCustomFit(){
+  if(customFiles.length!==5)return;
+  const clum=activeSide();
+  const deadList=customFiles.filter(f=>isDead(f,clum));
+  const kept=customFiles.filter(f=>!isDead(f,clum));
+  if(deadList.length){
+    const detail=deadList.map(f=>"  "+f.name+"  "+(clum===1?"左 B~E":"右 F~I")+" Δ "+f.diag[clum].sp.join(" / ")).join("\n");
+    if(!document.getElementById("autoDrop").checked){
+      log("❌ 以下文件在"+(clum===1?"左侧":"右侧")+"无信号（4 通道幅度均 < "+SPAN_MIN+" counts）：\n"+detail+"\n请重新测量，或勾选「自动剔除无信号文件后继续拟合」。");
+      return;
+    }
+    if(kept.length<4){
+      log("❌ 无信号文件过多，剔除后只剩 "+kept.length+" 个（至少需要 4 个）：\n"+detail);
+      return;
+    }
+    log("⚠ 已剔除 "+deadList.length+" 个无信号文件，用其余 "+kept.length+" 个拟合（"+(kept.length-1)+" 个偏心）：\n"+detail);
+  }
+  const files=kept.map(f=>f.rows);
+  let centerIdx=kept.findIndex(f=>f.center);
+  if(centerIdx<0)centerIdx=kept.length-1;
+  // A~F 求解统一在 src\algorithm.py，这里只传数据、算统计、画图
+  const compact=files.map(rows=>rows.map(r=>[r[0],r[clum],r[clum+1],r[clum+2],r[clum+3]]));
+  const dropNote=deadList.length?"（已剔除 "+deadList.map(f=>f.name).join("、")+"）":"";
+  setTimeout(async()=>{
+    try{
+      let _n=DATA["_order"].filter(s=>s.startsWith("自定义")).length+1;
+      while(DATA["_order"].includes("自定义"+_n))_n++;
+      const name="自定义"+_n;
+      log("拟合中：8 个方案（Python 求解）"+dropNote);
+      const res=await callApi("fit_all",compact,centerIdx);
+      if(!res||!res.ok||!res.schemes){
+        log("❌ 拟合失败: "+((res&&res.error)||"后端无响应"));
+        return;
+      }
+      const schemes=res.schemes;
+      const bad=Object.entries(schemes).find(([k,p])=>!p||p.some(v=>!Number.isFinite(v)));
+      if(bad){
+        log("❌ "+bad[0]+" 拟合结果非有限（数据仍异常），已中止，未添加传感器");
+        return;
+      }
+      const out={};
+      for(const [k,params] of Object.entries(schemes)){
+        const cSeg=segRMS(files[centerIdx],clum,params), cAll=segAll(files[centerIdx],clum,params);
+        const ecc=files.filter((_,i)=>i!==centerIdx);
+        // 每个偏心文件先算分段RMS, 再对4个文件取段平均
+        const eSegsAll=ecc.map(fp=>{
+          const {rp}=getChannels(fp,clum);
+          return segRMSfromArrays(rp,segAll(fp,clum,params));
+        });
+        const eAll=ecc.map(fp=>segAll(fp,clum,params));
+        out[k]={
+          params:params.map(v=>Math.round(v*1e8)/1e8),
+          center_segs:cSeg,
+          center_rms:Math.round(rms(cAll)*100)/100,
+          ecc_segs:avgSegs(eSegsAll),
+          ecc_rms:Math.round(eAll.reduce((s,x)=>s+rms(x),0)/eAll.length*100)/100
+        };
+      }
+      DATA[name]=out;
+      DATA[name]._side=clum;
+      // 原始有效段数据(前4偏心+最后center), 供"自定义"方案实时计算
+      DATA[name]._raw=files.map(rows=>{
+        const {rp,chs}=getChannels(rows,clum);
+        return rp.map((p,i)=>[Math.round(p*100)/100,...chs.map(ch=>Math.round(ch[i]*10000)/10000)]);
+      });
+      DATA["_order"].push(name);
+      SENSORS.push(name);
+      customSet.add(name);
+      curS=name;
+      rebuildSensors();
+      render();
+      log("✅ "+name+" 拟合完成，已添加到传感器列表"+(deadList.length?"（剔除 "+deadList.map(f=>f.name).join("、")+"，中心="+kept[centerIdx].name+"，按 "+kept.length+" 文件计）":"")+"\n"+
+          Object.entries(schemes).map(([k,p])=>k+": A="+p[0].toFixed(4)+" B="+p[1].toFixed(4)+" C="+p[2].toFixed(4)+" D="+p[3].toFixed(4)+" E="+p[4].toFixed(6)+" F="+p[5].toFixed(4)).join("\n"));
+    }catch(e){
+      log("❌ 拟合失败: "+e.message);
+    }
+  },50);
+}
+function rms(arr){return Math.sqrt(arr.reduce((s,v)=>s+v*v,0)/arr.length);}
+function segAll(rows,clum,params){
+  const {rp,chs}=getChannels(rows,clum);
+  const pred=rp.map((p,i)=>model(params,chs[0][i],chs[1][i],chs[2][i],chs[3][i]));
+  return rp.map((p,i)=>p-pred[i]);
+}
+function segRMS(rows,clum,params){
+  const {rp}=getChannels(rows,clum);
+  const err=segAll(rows,clum,params);
+  const segs=[];
+  for(let lo=0;lo<220;lo+=10){
+    const vals=rp.map((p,i)=>p>=lo&&p<lo+10?err[i]:null).filter(v=>v!==null);
+    segs.push(vals.length?Math.round(Math.sqrt(vals.reduce((s,v)=>s+v*v,0)/vals.length)*100)/100:null);
+  }
+  return segs;
+}
+function avgSegs(all){
+  const out=[];
+  for(let i=0;i<22;i++){
+    const vals=all.map(x=>x[i]).filter(v=>v!==null&&v!==undefined);
+    out.push(vals.length?Math.round(vals.reduce((a,b)=>a+b,0)/vals.length*100)/100:null);
+  }
+  return out;
+}
+
+render();
+window.addEventListener("resize",render);
+
+</script>
+</body>
+</html>
