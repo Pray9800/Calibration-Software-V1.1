@@ -22,7 +22,8 @@ SCHEME_ORDER = [
 # PROFILES 字段说明：
 #   family=alt: 原始通道值、A~D 边界按 k 均值成比例（0.6~1.4）
 #   family=opt: 逐通道归一化、A~D 绝对边界 20~200
-#   weight  eq：各数据点等权；tol10/tol：按压力容差反比例加权
+#   weight  eq：各数据点等权；tol：按压力容差反比例加权；
+#           tol10：同 tol 的 10% 起算曲线做底权，再按“误差/容差”超差频段迭代放大
 #   center  中心文件的权重倍数；配合 weight 使用，如 1、8、16
 #   high    none：高压段不额外加权；fixed4：>=150N 固定 4 倍；
 #           linear4：150~220N 从 1 倍线性增加到 4 倍
@@ -34,6 +35,11 @@ PROFILES = {
     "S2中心16x+高压4x（线性版）": dict(family="opt", weight="tol", center=16, high="linear4"),
     "S2中心8x+高压4x（线性版）": dict(family="opt", weight="tol", center=8, high="linear4"),
 }
+
+# 容差验收表（与 index.html 的 DATA["_tol"] 同值，10N 一段）
+TOL = np.array([3, 3, 3, 3.45, 4.3, 5.1, 5.83, 6.51, 7.13, 7.68, 8.18, 8.63,
+                9.01, 9.33, 9.6, 9.8, 9.95, 10.04, 10.07, 10.04, 10.25, 10.75])
+
 
 # *******************************************************
 # Author: PAN       Version: V1.1       Date: 2026/11/23
@@ -141,7 +147,7 @@ def fit_s1(files, center_idx, clum):
 # Input: p: 压力数组；tags: 中心数据标记；prof: 方案配置
 # Output: 权重数组
 # Return: 权重数组
-#tol10: 10N以下按 10% 容差，10~200N 按 5~10% 容差线性过渡，200N以上按 5% 容差
+#tol10: 10N以下按 10% 容差，10~200N 按 5~10% 容差线性过渡，200N以上按 5% 容差（仅作迭代底权）
 #tol: 30N以下按 10% 容差，30~200N 按 5~10% 容差线性过渡，200N以上按 5% 容差
 #"fixed4": 150N以上固定 4 倍权重 
 #"linear4: 150~220N 按 1~4 倍线性过渡
@@ -226,20 +232,7 @@ def _initial_ef(files, center_idx, clum, X, y, prof, km):
 # Output: 拟合后的 A~F 参数
 # Return: 六个参数组成的列表
 # *******************************************************
-def fit_profile(files, center_idx, clum, prof, max_outer=None):
-    normalize = prof["family"] == "opt"  #是否归一化"opt" 才做归一化
-    X, y, tags, ranges = _dataset(files, center_idx, clum, normalize)  #数据合并
-    w = _weights(y, tags, prof)  # 计算权重 上文配置
-    km = k_mean(files, clum)     # 计算均值（四通道累加的k）
-    ef, abcd = _initial_ef(files, center_idx, clum, X, y, prof, km)  #   alt 家族直接拿 fit_s1 的结果起步；opt 家族用 55.0 和中心文件拟合结果起步
-    if prof["family"] == "alt":
-        lo = np.full(4, prof["bounds"][0] * km)  #范围
-        hi = np.full(4, prof["bounds"][1] * km)
-        max_outer = max_outer or 200  #200次迭代 
-    else:
-        lo = np.full(4, 20.0)   
-        hi = np.full(4, 200.0)
-        max_outer = max_outer or 3000  
+def _solve(X, y, w, ef, abcd, lo, hi, max_outer):
     ef = np.asarray(ef, dtype=float)
     for _ in range(max_outer):   #迭代次数
         E, F = ef
@@ -276,8 +269,64 @@ def fit_profile(files, center_idx, clum, prof, max_outer=None):
         ef = np.array([ne, nf])
         if dd < 1e-12:
             break
-    out = abcd / ranges if normalize else abcd
-    return [float(v) for v in (*out, ef[0], ef[1])]
+    return ef, abcd
+
+
+def _band_ratios(files, clum, params):
+    """每 10N 一段（b=3..19 即 30~200N）在各文件中的最大 RMS/容差。"""
+    a, b, c, d, e, f = params
+    ratio = np.zeros(len(TOL))
+    for rows in files:
+        rp, chs = _channels(rows, clum)
+        t = a * chs[0] + b * chs[1] + c * chs[2] + d * chs[3]
+        err = rp - (t - e * t * t - f * t)
+        band = np.clip((rp / 10).astype(int), 0, len(TOL) - 1)
+        for k in range(3, 20):
+            m = band == k
+            if m.any():
+                ratio[k] = max(ratio[k], float(np.sqrt(np.mean(err[m] ** 2))) / TOL[k])
+    return ratio
+
+
+def fit_profile(files, center_idx, clum, prof, max_outer=None):
+    normalize = prof["family"] == "opt"  #是否归一化"opt" 才做归一化
+    X, y, tags, ranges = _dataset(files, center_idx, clum, normalize)  #数据合并
+    w = _weights(y, tags, prof)  # 计算权重 上文配置
+    km = k_mean(files, clum)     # 计算均值（四通道累加的k）
+    ef, abcd = _initial_ef(files, center_idx, clum, X, y, prof, km)  #   alt 家族直接拿 fit_s1 的结果起步；opt 家族用 55.0 和中心文件拟合结果起步
+    if prof["family"] == "alt":
+        lo = np.full(4, prof["bounds"][0] * km)  #范围
+        hi = np.full(4, prof["bounds"][1] * km)
+        max_outer = max_outer or 200  #200次迭代 
+    else:
+        lo = np.full(4, 20.0)   
+        hi = np.full(4, 200.0)
+        max_outer = max_outer or 3000  
+    ef = np.asarray(ef, dtype=float)
+    if prof["weight"] != "tol10":   #其余方案单轮求解，权重固定
+        ef, abcd = _solve(X, y, w, ef, abcd, lo, hi, max_outer)
+        out = abcd / ranges if normalize else abcd
+        return [float(v) for v in (*out, ef[0], ef[1])]
+    # tol10：外层按“误差/容差”超差频段放大权重，最多 6 轮，保留最好一轮
+    band = np.clip((y / 10).astype(int), 0, len(TOL) - 1)
+    g = np.ones(len(TOL))
+    best, prev = None, None
+    for _ in range(6):
+        ef, abcd = _solve(X, y, w * g[band], ef, abcd, lo, hi, max_outer)
+        out = abcd / ranges if normalize else abcd
+        params = [float(v) for v in (*out, ef[0], ef[1])]
+        ratio = _band_ratios(files, clum, params)
+        mx = float(np.max(ratio[3:20]))
+        if best is None or mx < best[1]:
+            best = (params, mx)
+        if mx <= 1.0 or (prev is not None and (prev - mx) / prev < 0.02):
+            break
+        prev = mx
+        upd = np.where(ratio > 1.0, np.minimum(g * 1.5, 16.0), g)
+        if np.allclose(upd, g):
+            break
+        g = upd
+    return best[0]
 
 
 # *******************************************************

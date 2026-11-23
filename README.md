@@ -130,12 +130,12 @@ index.html  用返回的 A~F 算分段 RMS、画图、推荐
 
 ### 5.1 方案配置表
 
-6 个方案集中在 `algorithm.py` 的 `PROFILES`（`algorithm.py:27`）：
+6 个方案集中在 `algorithm.py` 的 `PROFILES`（`algorithm.py:31`）：
 
 | 字段 | 取值 | 含义 |
 |---|---|---|
 | `family` | `alt` / `opt` | alt=原始通道值、边界按 k 均值缩放；opt=逐通道归一化、绝对边界 20~200 |
-| `weight` | `eq` / `tol10` / `tol` | 等权 / 容差权（alt 版）/ 容差权（opt 版） |
+| `weight` | `eq` / `tol10` / `tol` | 等权 / 容差底权 + 按超差频段迭代放大（≤6 轮）/ 容差权 |
 | `center` | 1 / 8 / 16 | 中心文件权重倍数 |
 | `high` | `none` / `fixed4` / `linear4` | 150N 以上权重：不加 / 固定 ×4 / 150→220N 线性 1→4 |
 | `bounds` | (0.6,1.4) 等 | alt 专属：A~D 边界 = 倍数 × k 均值 |
@@ -148,7 +148,7 @@ index.html  用返回的 A~F 算分段 RMS、画图、推荐
 
 同时把 `SCHEME_ORDER` 和前端 `SCHEMES` / `REC_WEIGHT` 里的显示名改成 `S2中心10x`（不改名也能跑，只是名字会误导）。
 
-新增方案：在 `PROFILES` 加一项、`SCHEME_ORDER` 加名字，前端 `SCHEMES`（`index.html:555`）和 `REC_WEIGHT`（`index.html:759`）各加一项，可选补 `DOCS`（`index.html:864`）的说明。不需要写求解代码。
+新增方案：在 `PROFILES` 加一项、`SCHEME_ORDER` 加名字，前端 `SCHEMES`（`index.html:555`）和 `REC_WEIGHT`（`index.html:759`）各加一项，可选补 `DOCS`（`index.html:868`）的说明。不需要写求解代码。
 
 ### 5.2 数值对齐
 
@@ -437,13 +437,13 @@ P = t - E*t² - F*t
 
 | 函数 | 行号 | 作用 |
 |---|---|---|
-| `parseCSV` | 986 | 解析 CSV，过滤非数字行 |
-| `getRange` | 997 | 有效压力段（与 Python 同规则） |
-| `getChannels` | 1007 | 取 4 通道并按首行去零点 |
-| `model` | 1018 | 用 A~F 计算压力，画图与分段 RMS 用 |
-| `runCustomFit` | 1126 | 选文件、判方向、调 `fit_all`、写 `DATA` |
+| `parseCSV` | 969 | 解析 CSV，过滤非数字行 |
+| `getRange` | 980 | 有效压力段（与 Python 同规则） |
+| `getChannels` | 990 | 取 4 通道并按首行去零点 |
+| `model` | 1001 | 用 A~F 计算压力，画图与分段 RMS 用 |
+| `runCustomFit` | 1109 | 选文件、判方向、调 `fit_all`、写 `DATA` |
 
-方案清单（`algorithm.py:14` 与 `PROFILES:27`；前端展示 `index.html:555`）：
+方案清单（`algorithm.py:14` 与 `PROFILES:31`；前端展示 `index.html:555`）：
 
 | 方案 | `PROFILES` 配置 |
 |---|---|
@@ -454,7 +454,7 @@ P = t - E*t² - F*t
 | S2中心16x+高压4x（线性版） | `family="opt", weight="tol", center=16, high="linear4"` |
 | S2中心8x+高压4x（线性版） | `family="opt", weight="tol", center=8, high="linear4"` |
 
-拟合结果元素顺序固定为 `[A, B, C, D, E, F]`，写入设备页时按此顺序填 `fwA~fwF`（`index.html:978`）。
+拟合结果元素顺序固定为 `[A, B, C, D, E, F]`，写入设备页时按此顺序填 `fwA~fwF`（`index.html:538`）。
 
 ### 12.4 设备页的「获取参数 / 拟合验证」
 
