@@ -783,13 +783,14 @@ function recommend(name){
   const s1=evalRec(name,"S1"); // 计算 S1 基准方案的误差指标
   if(!s1)return null; // 没有 S1 结果时无法比较，返回空
   const s1ehp=s1.ecc.reduce((s,v)=>s+v.hp,0)/s1.ecc.length; // 计算 S1 四组偏心数据的高压段 RMS 平均值
-  const cands=REC_SCHEMES.filter(m=>REC_WEIGHT[m]<=16) // 仅考虑权重不超过 16 的候选方案
+  const cands=REC_SCHEMES.filter(m=>REC_WEIGHT[m]<=16) // 仅考虑权重不超过 16 的候选方案 
     .map(m=>evalRec(name,m)) // 计算每个候选方案的误差指标
     .filter(Boolean) // 排除没有有效评估结果的方案
     .map(x=>{ // 逐个计算候选方案是否满足推荐条件
-      const beats=x.ecc.filter((e,i)=>e.rms<s1.ecc[i].rms).length; // 统计 RMS 优于 S1 的偏心数据组数
+      const beats=x.ecc.filter((e,i)=>e.rms<s1.ecc[i].rms).length; // 统计  RMS 优于 S1 的偏心数据组数
       const ehp=x.ecc.reduce((s,v)=>s+v.hp,0)/x.ecc.length; // 计算候选方案四组偏心数据的高压段 RMS 平均值
-      const ok1=x.mx<=1.0; // 条件1：所有被检查分段的 RMS/容差最大值不超过 1
+      const ok1=x.mx<=1.0; // 条件1：所有被检查分段的 RMS/容差最大值不超过 30N到200N的容差要求
+     //段	30~40	60~70	100~110	150~160	190~200 TOL	3.45N	5.83N	8.18N	9.8N	10.04N
       const ok2=(s1.center.hp-x.center.hp)/s1.center.hp>=0.10 && (s1ehp-ehp)/s1ehp>=0.10; // 条件2：中心及偏心平均高压段 RMS 都比 S1 至少降低 10%
       const ok3=x.center.rms<s1.center.rms && beats===4; // 条件3：中心 RMS 优于 S1，且四组偏心 RMS 全部优于 S1
       const ok4=REC_WEIGHT[x.m]<=16; // 条件4：候选方案权重不超过 16（与上面的筛选条件一致）
