@@ -24,8 +24,9 @@ V1.1 与 `标定软件exe\` 的唯一结构差异：**A~F 求解从 index.html �
 | 串口连接 / 写参数 / 验证 / 关机 | 采集页按钮 → `Api.serial_write_params` / `serial_command` |
 | 第 5 帧取零点、左右压力换算 | `SerialLink._handle` |
 | 导出 CSV（8 通道全非零才记录） | `CsvLogger` |
-| 获取参数（4 个偏心文件的 k） | 采集页同名按钮 → `Api.get_k` → `algorithm.k_one_rows` |
-| 获取补偿参数 E/F | 采集页同名按钮，仍在 JS（`calibrationPar`，与 8 方案无关） |
+| 获取参数 | 从参数计算页带入当前传感器、当前方案的 A~F（不再读 CSV） |
+| 拟合验证 | 采集页「拟合验证」导入写入后采集的 CSV，按 10N 分段统计 J/K 误差 |
+| 获取补偿参数 E/F | 已删除，E/F 随方案一起带入 |
 | 原软件内置的 5 个传感器示例 | 已全部删除，改为上传 CSV |
 
 原 HTML 里的 8 个内置样例传感器也已清空（`SENSORS = []`），只保留上传后拟合。
@@ -147,7 +148,7 @@ index.html  用返回的 A~F 算分段 RMS、画图、推荐
 
 同时把 `SCHEME_ORDER` 和前端 `SCHEMES` / `REC_WEIGHT` 里的显示名改成 `S2中心10x`（不改名也能跑，只是名字会误导）。
 
-新增方案：在 `PROFILES` 加一项、`SCHEME_ORDER` 加名字，前端 `SCHEMES`（`index.html:537`）和 `REC_WEIGHT`（`index.html:741`）各加一项。不需要写求解代码。
+新增方案：在 `PROFILES` 加一项、`SCHEME_ORDER` 加名字，前端 `SCHEMES`（`index.html:555`）和 `REC_WEIGHT`（`index.html:759`）各加一项，可选补 `DOCS`（`index.html:864`）的说明。不需要写求解代码。
 
 ### 5.2 数值对齐
 
@@ -200,7 +201,7 @@ cd /d "E:\EMB-01\S2标定计算器\标定软件V1.1\src"
 3. 选左/右侧（左侧写参数码 1/读码 2；右侧 5/6）。
 4. 「初始化参数」→「测试」→ 依次 50/100/150/200/250N。
 5. 「导出数据」开始记录，100ms 一行；「结束导出」停止；「打开文件夹」定位 CSV。
-6. 参数流程：先选 4 个偏心 CSV + 1 个中心 CSV →「获取参数」得 A~D（E/F 置 0）→「获取补偿参数」得 E/F →「写参数」下发。
+6. 参数流程：在「参数计算」页拟合出 A~F → 采集页「获取参数」带入 →「写参数」下发 →「验证参数」回读 →「拟合验证」导入写入后采集的 CSV，按 10N 分段看误差。
 
 `0N` 按钮不下发任何指令（与原软件一致，原代码该分支只有注释）。
 
@@ -378,7 +379,7 @@ b9a50000000019000002020200000000320000000000000000000000000a00000000000000000000
 | `pick_files` | — | 选择的 CSV 路径数组（原生对话框，多选） |
 | `read_text` | `path` | `{ok, text}`，依次尝试 UTF-8-SIG / GBK / Latin-1 |
 | `fit_all` | `files, center_idx` | `{ok, schemes}`；`schemes` 为 `{方案名: [A,B,C,D,E,F]}`，实现在 `src\algorithm.py` |
-| `get_k` | `rows, clum` | `{ok, value}`；4 通道求和后过原点斜率，供设备页「获取参数」 |
+| `get_k` | `rows, clum` | `{ok, value}`；4 通道求和后过原点斜率（原「获取参数」用，界面已不再调用） |
 | `shutdown` | — | 无返回值，关闭串口/TCP/日志 |
 | `on_closing` | — | 窗口关闭事件，返回 `True` |
 
@@ -442,7 +443,7 @@ P = t - E*t² - F*t
 | `model` | 1018 | 用 A~F 计算压力，画图与分段 RMS 用 |
 | `runCustomFit` | 1126 | 选文件、判方向、调 `fit_all`、写 `DATA` |
 
-方案清单（`algorithm.py:14` 与 `PROFILES:27`；前端展示 `index.html:537`）：
+方案清单（`algorithm.py:14` 与 `PROFILES:27`；前端展示 `index.html:555`）：
 
 | 方案 | `PROFILES` 配置 |
 |---|---|
@@ -457,11 +458,12 @@ P = t - E*t² - F*t
 
 拟合结果元素顺序固定为 `[A, B, C, D, E, F]`，写入设备页时按此顺序填 `fwA~fwF`（`index.html:978`）。
 
-### 12.4 设备页的「获取参数 / 获取补偿参数」
+### 12.4 设备页的「获取参数 / 拟合验证」
 
-- 获取参数（`index.html:444`）：4 个偏心文件分别调用后端 `get_k`（`backend.py:423` → `algorithm.k_one_rows`），依次作为 A~D，E/F 置 0。
-- 获取补偿参数（`index.html:463`）：第 5 个（中心）文件按 `calibrationPar` 拟合 E/F。
-- `calibrationPar`（`index.html:499`）：左侧用列 9、右侧用列 10；有效段从连续 3 行压力 >0 开始，到压力 >200 结束；少于 10 个有效点返回 `null`；加权最小二乘解 `err = E*P² + F*P`。
+- 获取参数：从参数计算页取当前传感器、当前方案的 A~F（`getCurParams`），经 `deviceApplyParams` 填入 `fwA~fwF`，并把「方向」切到该传感器所属侧。
+- 拟合验证：导入「写参数」并「验证参数」之后采集的 CSV；按真实压力（第 1 列）每 10N 分段，统计 J（第 10 列，左侧）或 K（第 11 列，右侧）与真实压力的平均误差、最大绝对误差。
+- 若所选侧整列为 0，提示「不是写入 A~F 后采集的文件，或还没验证参数读回系数」，不出表。
+- 设备页已删除 5 个 CSV 选择槽位与「获取补偿参数」按钮；A~F 统一由参数计算页产生。`calibrationPar` 保留在 `index.html` 但已无调用。
 
 ---
 
@@ -485,7 +487,7 @@ P = t - E*t² - F*t
 | 方案顺序 / 配置 | `src\algorithm.py:14`（`SCHEME_ORDER`）与 `27`（`PROFILES`） |
 | 拟合算法 | `src\algorithm.py:38-213`（`fit_profile` 在 `154`，`fit_all` 在 `208`） |
 | 新增后端接口 | `src\backend.py:413-431`（`list_ports/fit_all/get_k`），前端用 `callApi` 调用 |
-| 方案页签名字 | `src\web\index.html:537`；推荐权重 `741` |
+| 方案页签名字 | `src\web\index.html:555`；推荐权重 `759` |
 | 页面布局 / 样式 | `src\web\index.html:1-290` |
 
 新增加压档位需要同时改两处：`backend.py` 的 `TCP_PRESSURE` 加键值，`index.html` 加压按钮区（`index.html:162-167`）加 `data-press` 按钮。

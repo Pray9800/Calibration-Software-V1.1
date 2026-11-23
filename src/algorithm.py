@@ -21,9 +21,14 @@ SCHEME_ORDER = [
     "S2中心16x+高压4x（线性版）",
     "S2中心8x+高压4x（线性版）",
 ]
-
-# family=alt: 原始通道值、A~D 边界按 k 均值成比例（0.6~1.4，中心优先 0.3~3.0）
-# family=opt: 逐通道归一化、A~D 绝对边界 20~200
+# PROFILES 字段说明：
+#   family=alt: 原始通道值、A~D 边界按 k 均值成比例（0.6~1.4，中心优先 0.3~3.0）
+#   family=opt: 逐通道归一化、A~D 绝对边界 20~200
+#   weight  eq：各数据点等权；tol10/tol：按压力容差反比例加权
+#   center  中心文件的权重倍数；配合 weight 使用，如 8、16、32
+#   high    none：高压段不额外加权；fixed4：>=150N 固定 4 倍；
+#           linear4：150~220N 从 1 倍线性增加到 4 倍
+#   bounds  仅 family=alt 使用：(下限系数, 上限系数)，乘以 k 均值得到实际 A~D 边界
 PROFILES = {
     "S2联合": dict(family="alt", weight="eq", center=1, high="none", bounds=(0.6, 1.4)),
     "S2中心8x": dict(family="alt", weight="eq", center=8, high="none", bounds=(0.6, 1.4)),
@@ -34,7 +39,13 @@ PROFILES = {
     "S2中心8x+高压4x（线性版）": dict(family="opt", weight="tol", center=8, high="linear4"),
 }
 
-
+# *******************************************************
+# Author: PAN       Version: V1.1       Date: 2026/11/23
+# Description: 获取压力数据的有效起止范围
+# Input: rows: 数据行；end_thresh: 结束压力阈值
+# Output: 有效数据的起止下标
+# Return: (起始下标, 结束下标)，按左闭右开处理 
+# *******************************************************
 def _get_range(rows, end_thresh):
     rs, re = 0, len(rows) - 1
     for i in range(len(rows) - 2):
@@ -42,35 +53,71 @@ def _get_range(rows, end_thresh):
             rs = i
             break
     for i in range(len(rows)):
-        if rows[i][0] > end_thresh:
+        if rows[i][0] > end_thresh:   #超过阈值
             re = i
             break
     return rs, re
 
 
+# *******************************************************
+# Author: PAN       Version: V1.1       Date: 2026/11/23
+# Description: 提取四个通道并扣除初始值
+# Input: rows: 数据行；clum: 通道起始列
+# Output: 压力数组和四通道数据
+# Return: (压力数组, 通道数组)
+# *******************************************************
 def _channels(rows, clum):
     rs, re = _get_range(rows, 220.5)
     rp = np.asarray(rows[rs:re, 0], dtype=float)
-    chs = np.asarray(rows[:, clum:clum + 4].T, dtype=float).copy()
-    chs -= chs[:, :1]
-    return rp, chs[:, rs:re]
+    chs = np.asarray(rows[:, clum:clum + 4].T, dtype=float).copy() #复制提取1列到4列
+    chs -= chs[:, :1]   #初始变化
+    return rp, chs[:, rs:re]  #上传有效列
 
 
+# *******************************************************
+# Author: PAN       Version: V1.1       Date: 2026/11/23
+# Description: 计算单组数据的 k 值
+# Input: rows: 数据行；clum: 通道起始列
+# Output: 单组数据的 k 值
+# Return: 浮点数
+# *******************************************************
 def k_one(rows, clum):
-    rp, chs = _channels(rows, clum)
-    s = chs.sum(axis=0)
-    sxx = float(s @ s)
-    return float(s @ rp) / sxx if sxx > 0 else 0.0
+    rp, chs = _channels(rows, clum) 
+    s = chs.sum(axis=0)  #累加通道n 所有数值 比如一个压力值对于所有应变片参数值
+    sxx = float(s @ s)   #平方 做分母
+    return float(s @ rp) / sxx if sxx > 0 else 0.0   #计算k值 公式 k = sum(s[i]*rp[i])/sum(s[i]^2)  s[i]为通道n的应变片参数值  rp[i]为压力值  最小二乘法
 
 
+# *******************************************************
+# Author: PAN       Version: V1.1       Date: 2026/11/23
+# Description: 计算多组数据 k 值的平均值
+# Input: files: 多组数据；clum: 通道起始列
+# Output: k 值平均值
+# Return: 浮点数
+# *******************************************************
 def k_mean(files, clum):
-    return sum(k_one(f, clum) for f in files) / len(files)
+    return sum(k_one(f, clum) for f in files) / len(files)  #计算平均值{压力值 } = k {应变片总读数 } s
 
 
+# *******************************************************
+# Author: PAN       Version: V1.1       Date: 2026/11/23
+# Description: 接收普通行列表并计算单组 k 值
+# Input: rows: 数据行列表；clum: 通道起始列
+# Output: 单组数据的 k 值
+# Return: 浮点数
+# *******************************************************
 def k_one_rows(rows, clum):
-    return k_one(np.asarray(rows, dtype=float), int(clum))
+    return k_one(np.asarray(rows, dtype=float), int(clum))  #不参与拟合参与后续的显示
 
 
+
+# *******************************************************
+# Author: PAN       Version: V1.1       Date: 2026/11/23
+# Description: 使用 S1 方案拟合 A~F 参数
+# Input: files: 多组数据；center_idx: 中心数据下标；clum: 通道起始列
+# Output: A~F 参数
+# Return: 六个参数组成的列表
+# *******************************************************
 def fit_s1(files, center_idx, clum):
     a, b, c, d = [k_one(f, clum) for f in files][:4]
     rows = files[center_idx]
@@ -92,6 +139,17 @@ def fit_s1(files, center_idx, clum):
             (s11 * sy2 - s12 * sy1) / det]
 
 
+# *******************************************************
+# Author: PAN       Version: V1.1       Date: 2026/11/23
+# Description: 按方案配置计算各数据点的拟合权重
+# Input: p: 压力数组；tags: 中心数据标记；prof: 方案配置
+# Output: 权重数组
+# Return: 权重数组
+#tol10: 10N以下按 10% 容差，10~200N 按 5~10% 容差线性过渡，200N以上按 5% 容差
+#tol: 30N以下按 10% 容差，30~200N 按 5~10% 容差线性过渡，200N以上按 5% 容差
+#"fixed4": 150N以上固定 4 倍权重 
+#"linear4: 150~220N 按 1~4 倍线性过渡
+# *******************************************************
 def _weights(p, tags, prof):
     w = np.ones_like(p)
     if prof["weight"] == "tol10":
@@ -111,6 +169,13 @@ def _weights(p, tags, prof):
     return w * np.where(tags, float(prof["center"]), 1.0)
 
 
+# *******************************************************
+# Author: PAN       Version: V1.1       Date: 2026/11/23
+# Description: 整理拟合数据并按需归一化通道
+# Input: files: 多组数据；center_idx: 中心数据下标；clum: 通道起始列；normalize: 是否归一化
+# Output: 通道、压力、中心标记和归一化范围
+# Return: (X, y, tags, ranges)
+# *******************************************************
 def _dataset(files, center_idx, clum, normalize):
     ranges = np.ones(4)
     if normalize:
@@ -127,6 +192,13 @@ def _dataset(files, center_idx, clum, normalize):
     return np.hstack(xs), np.concatenate(ys), np.concatenate(tags), ranges
 
 
+# *******************************************************
+# Author: PAN       Version: V1.1       Date: 2026/11/23
+# Description: 根据方案生成 E、F 和 A~D 的初始值
+# Input: 拟合数据、方案配置及 k 均值
+# Output: E、F 初值和 A~D 初值
+# Return: (ef, abcd)
+# *******************************************************
 def _initial_ef(files, center_idx, clum, X, y, prof, km):
     if prof["family"] == "alt":
         s1 = fit_s1(files, center_idx, clum)
@@ -151,22 +223,29 @@ def _initial_ef(files, center_idx, clum, X, y, prof, km):
     return np.array([-0.001, 0.1]), np.full(4, b0)
 
 
+# *******************************************************
+# Author: PAN       Version: V1.1       Date: 2026/11/23
+# Description: 按指定方案迭代拟合 A~F 参数
+# Input: files: 多组数据；center_idx: 中心下标；clum: 通道起始列；prof: 方案配置
+# Output: 拟合后的 A~F 参数
+# Return: 六个参数组成的列表
+# *******************************************************
 def fit_profile(files, center_idx, clum, prof, max_outer=None):
-    normalize = prof["family"] == "opt"
-    X, y, tags, ranges = _dataset(files, center_idx, clum, normalize)
-    w = _weights(y, tags, prof)
-    km = k_mean(files, clum)
-    ef, abcd = _initial_ef(files, center_idx, clum, X, y, prof, km)
+    normalize = prof["family"] == "opt"  #是否归一化"opt" 才做归一化
+    X, y, tags, ranges = _dataset(files, center_idx, clum, normalize)  #数据合并
+    w = _weights(y, tags, prof)  # 计算权重 上文配置
+    km = k_mean(files, clum)     # 计算均值（四通道累加的k）
+    ef, abcd = _initial_ef(files, center_idx, clum, X, y, prof, km)  #   alt 家族直接拿 fit_s1 的结果起步；opt 家族用 55.0 和中心文件拟合结果起步
     if prof["family"] == "alt":
-        lo = np.full(4, prof["bounds"][0] * km)
+        lo = np.full(4, prof["bounds"][0] * km)  #范围
         hi = np.full(4, prof["bounds"][1] * km)
-        max_outer = max_outer or 200
+        max_outer = max_outer or 200  #200次迭代 
     else:
-        lo = np.full(4, 20.0)
+        lo = np.full(4, 20.0)   
         hi = np.full(4, 200.0)
-        max_outer = max_outer or 3000
+        max_outer = max_outer or 3000  
     ef = np.asarray(ef, dtype=float)
-    for _ in range(max_outer):
+    for _ in range(max_outer):   #迭代次数
         E, F = ef
         for _ in range(40):
             t = abcd @ X
@@ -205,6 +284,13 @@ def fit_profile(files, center_idx, clum, prof, max_outer=None):
     return [float(v) for v in (*out, ef[0], ef[1])]
 
 
+# *******************************************************
+# Author: PAN       Version: V1.1       Date: 2026/11/23
+# Description: 运行全部标定方案
+# Input: files: 多组数据；center_idx: 中心下标；clum: 通道起始列
+# Output: 各方案的 A~F 参数
+# Return: 以方案名为键的字典
+# *******************************************************
 def fit_all(files, center_idx, clum):
     files = [np.asarray(f, dtype=float) for f in files]
     out = {"S1": fit_s1(files, center_idx, clum)}
@@ -213,6 +299,13 @@ def fit_all(files, center_idx, clum):
     return out
 
 
+# *******************************************************
+# Author: PAN       Version: V1.1       Date: 2026/11/23
+# Description: 读取 CSV 并转换为数值数组
+# Input: path: CSV 文件路径
+# Output: 文件中的数据行
+# Return: NumPy 浮点数组
+# *******************************************************
 def read_csv(path):
     rows = []
     with open(path, encoding="utf-8", errors="replace") as fh:

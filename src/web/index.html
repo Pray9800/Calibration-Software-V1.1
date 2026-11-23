@@ -187,11 +187,6 @@ body{padding:0}
    </div>
    <div class="dev-card span2">
     <h3>GAPSENSE-RES</h3>
-    <div class="file-row"><span>偏心1</span><input id="csv0" readonly placeholder="选择 CSV"><button class="dev-btn" data-file="0">打开</button></div>
-    <div class="file-row"><span>偏心2</span><input id="csv1" readonly placeholder="选择 CSV"><button class="dev-btn" data-file="1">打开</button></div>
-    <div class="file-row"><span>偏心3</span><input id="csv2" readonly placeholder="选择 CSV"><button class="dev-btn" data-file="2">打开</button></div>
-    <div class="file-row"><span>偏心4</span><input id="csv3" readonly placeholder="选择 CSV"><button class="dev-btn" data-file="3">打开</button></div>
-    <div class="file-row"><span>中心</span><input id="csv4" readonly placeholder="选择 CSV"><button class="dev-btn" data-file="4">打开</button></div>
     <div class="dev-row">
       <label>方向</label>
       <label><input type="radio" name="devSide" value="1"> 左侧</label>
@@ -202,7 +197,6 @@ body{padding:0}
       <label>A</label><input id="fwA"><label>B</label><input id="fwB"><label>C</label><input id="fwC">
       <label>D</label><input id="fwD"><label>E</label><input id="fwE"><label>F</label><input id="fwF">
       <button id="btnGetParams" class="dev-btn">获取参数</button>
-      <button id="btnGetComp" class="dev-btn">获取补偿参数</button>
       <button id="btnWriteParams" class="dev-btn primary">写参数</button>
       <button id="btnVerifyParams" class="dev-btn">验证参数</button>
     </div>
@@ -219,6 +213,15 @@ body{padding:0}
       <label>D</label><input id="vD" readonly><label>E</label><input id="vE" readonly><label>F</label><input id="vF" readonly>
     </div>
     <div class="dev-note" id="devMsg"></div>
+    <div class="dev-row">
+      <button id="btnFitVerify" class="dev-btn">拟合验证</button>
+      <span style="color:#8b949e;font-size:12px">写入并验证 A~F 后，导入本次采集的 CSV，按 10N 分段看误差</span>
+    </div>
+    <div id="fvPanel" style="display:none">
+      <div class="file-row"><span>验证文件</span><input id="fvFile" readonly placeholder="选择写入 A~F 后采集的 CSV"><button class="dev-btn" id="btnFvPick">打开</button></div>
+      <div class="dev-note" id="fvMeta"></div>
+      <div id="fvResult"></div>
+    </div>
    </div>
   </div>
  </div>
@@ -309,6 +312,31 @@ function switchPage(p){
   if(p==="device")setTimeout(drawRt,30);
 }
 function devSide(){return parseInt((document.querySelector("input[name=devSide]:checked")||{value:5}).value);}
+
+const FV={rows:null,name:""};
+const FV_SIDE_COL={1:9,5:10};
+function renderFitVerify(){
+  const box=document.getElementById("fvResult"),meta=document.getElementById("fvMeta");
+  if(!FV.rows){box.innerHTML="";meta.textContent="";return;}
+  const side=devSide(),col=FV_SIDE_COL[side];
+  const bins=new Map();let used=0,zero=0;
+  FV.rows.forEach(r=>{
+    const p=r[0],v=r[col];
+    if(!Number.isFinite(p)||!Number.isFinite(v)||p<0)return;
+    if(v===0)zero++;
+    const lo=Math.floor(p/10)*10;
+    let b=bins.get(lo);if(!b){b={n:0,sum:0,max:0};bins.set(lo,b);}
+    b.n++;b.sum+=v-p;b.max=Math.max(b.max,Math.abs(v-p));used++;
+  });
+  if(!used){box.innerHTML="";meta.textContent="文件里没有可用的压力数据";return;}
+  if(zero===used){box.innerHTML="";meta.textContent="第 "+(side===1?10:11)+" 列为 0：这不是写入 A~F 后采集的文件，或还没「验证参数」读回系数";return;}
+  meta.textContent=FV.name+"  ·  "+(side===1?"左侧（J 列）":"右侧（K 列）")+"  ·  "+used+" 点，其中零值 "+zero+" 点";
+  const body=[...bins.keys()].sort((a,b)=>a-b).map(lo=>{
+    const b=bins.get(lo);
+    return `<tr><td>${lo}~${lo+10} N</td><td>${b.n}</td><td>${(b.sum/b.n).toFixed(2)}</td><td>${b.max.toFixed(2)}</td></tr>`;
+  }).join("");
+  box.innerHTML=`<table class="mini"><thead><tr><th>压力段</th><th>点数</th><th>平均误差 (N)</th><th>最大绝对误差 (N)</th></tr></thead><tbody>${body}</tbody></table>`;
+}
 
 async function refreshPorts(){
   const ports=await callApi("list_ports")||[];
@@ -437,44 +465,29 @@ function bindDevice(){
   document.getElementById("btnOpenLog").onclick=()=>callApi("open_log_folder");
 
   document.querySelectorAll("input[name=devSide]").forEach(r=>r.onchange=async()=>{
-    await callApi("set_side",devSide());showVerify();
+    await callApi("set_side",devSide());showVerify();renderFitVerify();
   });
 
-  document.querySelectorAll("[data-file]").forEach(b=>b.onclick=async()=>{
-    const i=parseInt(b.dataset.file);
-    const paths=await callApi("pick_files");
-    if(paths&&paths.length){DEV.csv=DEV.csv||[];DEV.csv[i]=paths[0];document.getElementById("csv"+i).value=paths[0];}
-  });
-
-  document.getElementById("btnGetParams").onclick=async()=>{
-    const side=devSide();
-    const ks=[];
-    for(let i=0;i<4;i++){
-      const p=(DEV.csv||[])[i]||document.getElementById("csv"+i).value;
-      if(!p){toast("先选择偏心"+(i+1)+"的 CSV");return;}
-      const r=await callApi("read_text",p);
-      if(!r||!r.ok){toast("读取失败："+p);return;}
-      const kv=await callApi("get_k",parseCSV(r.text),side);
-      if(!kv||!kv.ok){toast("该方向数据无效，请检查左侧/右侧");return;}
-      ks.push(kv.value);
-    }
-    if(ks.some(v=>!Number.isFinite(v))){toast("该方向数据无效，请检查左侧/右侧");return;}
-    ["A","B","C","D"].forEach((k,i)=>document.getElementById("fw"+k).value=String(ks[i]));
-    document.getElementById("fwE").value="0";
-    document.getElementById("fwF").value="0";
-    toast("已获取 A~D，E/F 置 0");
+  document.getElementById("btnGetParams").onclick=()=>{
+    if(!curS||!DATA[curS]){toast("参数计算页还没有结果，请先添加传感器");return;}
+    const side=parseInt(DATA[curS]._side||devSide());
+    deviceApplyParams(side,getCurParams());
   };
 
-  document.getElementById("btnGetComp").onclick=async()=>{
-    const p=(DEV.csv||[])[4]||document.getElementById("csv4").value;
-    if(!p){toast("先选择中心 CSV");return;}
-    const r=await callApi("read_text",p);
-    if(!r||!r.ok){toast("读取失败："+p);return;}
-    const ef=calibrationPar(parseCSV(r.text),devSide());
-    if(!ef){toast("中心文件缺少压力列或数据不足");return;}
-    document.getElementById("fwE").value=String(ef[0]);
-    document.getElementById("fwF").value=String(ef[1]);
-    toast("已获取补偿参数 E/F");
+  document.getElementById("btnFitVerify").onclick=()=>{
+    const panel=document.getElementById("fvPanel");
+    panel.style.display=panel.style.display==="none"?"":"none";
+    if(panel.style.display!=="none")renderFitVerify();
+  };
+
+  document.getElementById("btnFvPick").onclick=async()=>{
+    const paths=await callApi("pick_files");
+    if(!paths||!paths.length)return;
+    const r=await callApi("read_text",paths[0]);
+    if(!r||!r.ok){toast("读取失败："+paths[0]);return;}
+    FV.rows=parseCSV(r.text);FV.name=paths[0].replace(/^.*[\/]/,"");
+    document.getElementById("fvFile").value=paths[0];
+    renderFitVerify();
   };
 
   document.getElementById("btnWriteParams").onclick=async()=>{
