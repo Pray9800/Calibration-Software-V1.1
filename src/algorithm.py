@@ -23,7 +23,7 @@ SCHEME_ORDER = [
 #   family=alt: 原始通道值、A~D 边界按 k 均值成比例（0.6~1.4）
 #   family=opt: 逐通道归一化、A~D 绝对边界 20~200
 #   weight  eq：各数据点等权；tol：按压力容差反比例加权；
-#           tol10：同 tol 的 10% 起算曲线做底权，再按“误差/容差”超差频段迭代放大
+#           tol10：等权起步，按 10%~220N 各段“误差/10%→5%容差”迭代放大超差频段
 #   center  中心文件的权重倍数；配合 weight 使用，如 1、8、16
 #   high    none：高压段不额外加权；fixed4：>=150N 固定 4 倍；
 #           linear4：150~220N 从 1 倍线性增加到 4 倍
@@ -36,9 +36,14 @@ PROFILES = {
     "S2中心8x+高压4x（线性版）": dict(family="opt", weight="tol", center=8, high="linear4"),
 }
 
-# 容差验收表（与 index.html 的 DATA["_tol"] 同值，10N 一段）
-TOL = np.array([3, 3, 3, 3.45, 4.3, 5.1, 5.83, 6.51, 7.13, 7.68, 8.18, 8.63,
-                9.01, 9.33, 9.6, 9.8, 9.95, 10.04, 10.07, 10.04, 10.25, 10.75])
+# tol10 迭代的容差曲线：10N 起 10%，200N 降到 5%，之后保持 5%（10N 以下按 10N 计）
+_NBAND = 22   # 0~21 共 22 个 10N 段；迭代只看 1~21（10~220N）
+
+
+def _tol_curve(p):
+    t = np.maximum(p, 10.0)
+    frac = np.clip((t - 10.0) / 190.0, 0.0, 1.0)
+    return t * (0.10 - 0.05 * frac)
 
 
 # *******************************************************
@@ -147,19 +152,14 @@ def fit_s1(files, center_idx, clum):
 # Input: p: 压力数组；tags: 中心数据标记；prof: 方案配置
 # Output: 权重数组
 # Return: 权重数组
-#tol10: 10N以下按 10% 容差，10~200N 按 5~10% 容差线性过渡，200N以上按 5% 容差（仅作迭代底权）
+#tol10: 底权等权（1），超差频段的放大在 fit_profile 外层迭代里做
 #tol: 30N以下按 10% 容差，30~200N 按 5~10% 容差线性过渡，200N以上按 5% 容差
 #"fixed4": 150N以上固定 4 倍权重 
 #"linear4: 150~220N 按 1~4 倍线性过渡
 # *******************************************************
 def _weights(p, tags, prof):
     w = np.ones_like(p)
-    if prof["weight"] == "tol10":
-        t = np.maximum(p, 1.0)
-        frac = np.clip((t - 10.0) / 190.0, 0.0, 1.0)
-        tol = t * (0.10 - 0.05 * frac)
-        w = 1.0 / (tol * tol)
-    elif prof["weight"] == "tol":
+    if prof["weight"] == "tol":
         t = np.maximum(p, 30.0)
         frac = np.clip((t - 30.0) / 170.0, 0.0, 1.0)
         tol = t * (0.10 - 0.05 * frac)
@@ -273,18 +273,19 @@ def _solve(X, y, w, ef, abcd, lo, hi, max_outer):
 
 
 def _band_ratios(files, clum, params):
-    """每 10N 一段（b=3..19 即 30~200N）在各文件中的最大 RMS/容差。"""
+    """每 10N 一段，取 5 个文件中最大的 √mean((err/tol)²)；b=1..21 即 10~220N。"""
     a, b, c, d, e, f = params
-    ratio = np.zeros(len(TOL))
+    ratio = np.zeros(_NBAND)
     for rows in files:
         rp, chs = _channels(rows, clum)
         t = a * chs[0] + b * chs[1] + c * chs[2] + d * chs[3]
         err = rp - (t - e * t * t - f * t)
-        band = np.clip((rp / 10).astype(int), 0, len(TOL) - 1)
-        for k in range(3, 20):
+        band = np.clip((rp / 10).astype(int), 0, _NBAND - 1)
+        for k in range(1, _NBAND):
             m = band == k
             if m.any():
-                ratio[k] = max(ratio[k], float(np.sqrt(np.mean(err[m] ** 2))) / TOL[k])
+                ratio[k] = max(ratio[k], float(
+                    np.sqrt(np.mean((err[m] / _tol_curve(rp[m])) ** 2))))
     return ratio
 
 
@@ -307,16 +308,16 @@ def fit_profile(files, center_idx, clum, prof, max_outer=None):
         ef, abcd = _solve(X, y, w, ef, abcd, lo, hi, max_outer)
         out = abcd / ranges if normalize else abcd
         return [float(v) for v in (*out, ef[0], ef[1])]
-    # tol10：外层按“误差/容差”超差频段放大权重，最多 6 轮，保留最好一轮
-    band = np.clip((y / 10).astype(int), 0, len(TOL) - 1)
-    g = np.ones(len(TOL))
+    # tol10：等权起步，按“误差/容差”超差频段放大权重，最多 6 轮，保留最好一轮
+    band = np.clip((y / 10).astype(int), 0, _NBAND - 1)
+    g = np.ones(_NBAND)
     best, prev = None, None
     for _ in range(6):
         ef, abcd = _solve(X, y, w * g[band], ef, abcd, lo, hi, max_outer)
         out = abcd / ranges if normalize else abcd
         params = [float(v) for v in (*out, ef[0], ef[1])]
         ratio = _band_ratios(files, clum, params)
-        mx = float(np.max(ratio[3:20]))
+        mx = float(np.max(ratio[1:_NBAND]))
         if best is None or mx < best[1]:
             best = (params, mx)
         if mx <= 1.0 or (prev is not None and (prev - mx) / prev < 0.02):

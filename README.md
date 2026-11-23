@@ -135,7 +135,7 @@ index.html  用返回的 A~F 算分段 RMS、画图、推荐
 | 字段 | 取值 | 含义 |
 |---|---|---|
 | `family` | `alt` / `opt` | alt=原始通道值、边界按 k 均值缩放；opt=逐通道归一化、绝对边界 20~200 |
-| `weight` | `eq` / `tol10` / `tol` | 等权 / 容差底权 + 按超差频段迭代放大（≤6 轮）/ 容差权 |
+| `weight` | `eq` / `tol10` / `tol` | 等权 / 等权起步 + 按 10~220N 逐段"误差/10%→5%容差"迭代放大超差频段（≤6 轮）/ 容差权 |
 | `center` | 1 / 8 / 16 | 中心文件权重倍数 |
 | `high` | `none` / `fixed4` / `linear4` | 150N 以上权重：不加 / 固定 ×4 / 150→220N 线性 1→4 |
 | `bounds` | (0.6,1.4) 等 | alt 专属：A~D 边界 = 倍数 × k 均值 |
@@ -422,16 +422,19 @@ P = t - E*t² - F*t
 | 函数 | 位置 | 作用 |
 |---|---|---|
 | `SCHEME_ORDER` | `algorithm.py:14` | 方案顺序（前端页签按此排列） |
-| `PROFILES` | `algorithm.py:27` | 每个方案的权重/中心倍数/高压权重/边界配置表 |
-| `_get_range` | `algorithm.py:38` | 有效压力段：连续 3 个 >0 开始，到 >220.5 结束 |
-| `_channels` | `algorithm.py:51` | 取 4 通道并按首行去零点 |
-| `k_one` / `k_one_rows` | `algorithm.py:59/70` | 4 通道求和后过原点斜率，供 S1 与「获取参数」 |
-| `fit_s1` | `algorithm.py:74` | 前 4 个文件各取一个 k 作为 A~D，中心文件回归 E/F |
-| `_weights` | `algorithm.py:95` | 按 profile 生成容差权重、高压权重、中心倍率 |
-| `_initial_ef` | `algorithm.py:130` | 迭代/优化初值（E/F 或 b=55） |
-| `fit_profile` | `algorithm.py:154` | 交替迭代或优化求解，返回 `[A,B,C,D,E,F]` |
-| `fit_all` | `algorithm.py:208` | 依次跑 6 个方案，返回 `{方案名: 参数}` |
-| `read_csv` | `algorithm.py:216` | 读 CSV，空字段按 0 处理（对齐 JS `Number('')===0`） |
+| `PROFILES` | `algorithm.py:31` | 每个方案的权重/中心倍数/高压权重/边界配置表 |
+| `_tol_curve` / `_NBAND` | `algorithm.py:43` | tol10 迭代用的 10%→5% 容差曲线与 10N 段数（22 段，判定 1~21） |
+| `_get_range` | `algorithm.py:56` | 有效压力段：连续 3 个 >0 开始，到 >220.5 结束 |
+| `_channels` | `algorithm.py:76` | 取 4 通道并按首行去零点 |
+| `k_one` / `k_one_rows` | `algorithm.py:91/116` | 4 通道求和后过原点斜率，供 S1 与「获取参数」 |
+| `fit_s1` | `algorithm.py:128` | 前 4 个文件各取一个 k 作为 A~D，中心文件回归 E/F |
+| `_weights` | `algorithm.py:160` | 按 profile 生成容差权重、高压权重、中心倍率（tol10 的底权即 eq） |
+| `_initial_ef` | `algorithm.py:204` | 迭代/优化初值（E/F 或 b=55） |
+| `_solve` | `algorithm.py:235` | 固定 E/F 解 A~D、固定 A~D 解 E/F 的交替迭代 |
+| `_band_ratios` | `algorithm.py:275` | 10N 分段、5 文件取最大 `√mean((err/tol)²)` |
+| `fit_profile` | `algorithm.py:292` | 交替迭代或优化求解；tol10 在此做 ≤6 轮超差放大，返回 `[A,B,C,D,E,F]` |
+| `fit_all` | `algorithm.py:340` | 依次跑 6 个方案，返回 `{方案名: 参数}` |
+| `read_csv` | `algorithm.py:355` | 读 CSV，空字段按 0 处理（对齐 JS `Number('')===0`） |
 
 前端保留：
 
