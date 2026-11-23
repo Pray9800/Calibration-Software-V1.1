@@ -779,45 +779,85 @@ function evalRec(name,m){
   return {m,center,ecc,mx};
 }
 function recommend(name){
-  if(recCache[name])return recCache[name]; // 已计算过时直接返回缓存
-  const s1=evalRec(name,"S1"); // 计算 S1 基准方案的误差指标
-  if(!s1)return null; // 没有 S1 结果时无法比较，返回空
-  const s1ehp=s1.ecc.reduce((s,v)=>s+v.hp,0)/s1.ecc.length; // 计算 S1 四组偏心数据的高压段 RMS 平均值
-  const cands=REC_SCHEMES.filter(m=>REC_WEIGHT[m]<=16) // 仅考虑权重不超过 16 的候选方案 
-    .map(m=>evalRec(name,m)) // 计算每个候选方案的误差指标
-    .filter(Boolean) // 排除没有有效评估结果的方案
-    .map(x=>{ // 逐个计算候选方案是否满足推荐条件
-      const beats=x.ecc.filter((e,i)=>e.rms<s1.ecc[i].rms).length; // 统计  RMS 优于 S1 的偏心数据组数
-      const ehp=x.ecc.reduce((s,v)=>s+v.hp,0)/x.ecc.length; // 计算候选方案四组偏心数据的高压段 RMS 平均值
-      const ok1=x.mx<=1.0; // 条件1：所有被检查分段的 RMS/容差最大值不超过 30N到200N的容差要求
-     //段	30~40	60~70	100~110	150~160	190~200 TOL	3.45N	5.83N	8.18N	9.8N	10.04N
-      const ok2=(s1.center.hp-x.center.hp)/s1.center.hp>=0.10 && (s1ehp-ehp)/s1ehp>=0.10; // 条件2：中心及偏心平均高压段 RMS 都比 S1 至少降低 10%
-      const ok3=x.center.rms<s1.center.rms && beats===4; // 条件3：中心 RMS 优于 S1，且四组偏心 RMS 全部优于 S1
-      const ok4=REC_WEIGHT[x.m]<=16; // 条件4：候选方案权重不超过 16（与上面的筛选条件一致）
-      return {...x,beats,ok1,ok2,ok3,ok4,centerBetter:x.center.rms<s1.center.rms, // 保留原指标并附加条件结果及中心 RMS 比较结果
-              pass:(ok1?1:0)+(ok2?1:0)+(ok3?1:0)+(ok4?1:0)}; // 统计通过条件数，范围为 0～4
-    }).sort((a,b)=>b.pass-a.pass||(b.centerBetter-a.centerBetter)||(b.beats-a.beats)||(a.mx-b.mx)||(a.center.rms-b.center.rms)); // 依次按通过数、中心是否更优、偏心胜出数排序；再优先选 mx 和中心 RMS 较小者
-  const rec={name,cands,best:cands[0],s1}; // 汇总名称、候选列表、首选方案和 S1 基准
-  recCache[name]=rec; // 缓存结果，避免重复计算
-  return rec; // 返回推荐结果
+  if(recCache[name])return recCache[name];
+  const s1=evalRec(name,"S1");
+  if(!s1)return null;
+  const s1EccRms = s1.ecc.reduce((s,v)=>s+v.rms,0)/s1.ecc.length;
+  const s1EccHp  = s1.ecc.reduce((s,v)=>s+v.hp,0)/s1.ecc.length;
+
+  const maxRatio = (segs) => {
+    let m = 0;
+    for(let i=3;i<=19;i++) if(segs[i]!=null && TOL[i]) m = Math.max(m, segs[i]/TOL[i]);
+    return m;
+  };
+
+   const cands=REC_SCHEMES.filter(m=>REC_WEIGHT[m]<=16)
+    .map(m=>evalRec(name,m))
+    .filter(Boolean)
+    .map(x=>{
+      const eccRms = x.ecc.reduce((s,v)=>s+v.rms,0)/x.ecc.length;
+      const eccHp  = x.ecc.reduce((s,v)=>s+v.hp,0)/x.ecc.length;
+      const cMx = maxRatio(x.center.segs);
+      const eMx = Math.max(...x.ecc.map(e=>maxRatio(e.segs)));
+
+      // 【两条硬底线】(0~2分)
+      const base1 = cMx <= 1.15;        // 底①：中心点最差容差比 <= 1.15
+      const base2 = eccRms < s1EccRms;  // 底②：偏心平均 RMS 优于 S1
+      const isQualified = base1 && base2;
+      const basePass = (base1?1:0) + (base2?1:0);
+
+      // 【五条统一优先项】(0~5分)
+      const hpRatio = Math.max(x.center.hp / s1.center.hp, eccHp / s1EccHp);
+      const prio1 = cMx <= 0.9;                    // 优①：中心容差比 <= 0.9
+      const prio2 = cMx <= 0.8;                    // 优②：中心容差比 <= 0.8
+      const prio3 = hpRatio < 1.0;                 // 优③：高压段中心与偏心均优于 S1
+      const prio4 = x.center.rms < s1.center.rms;  // 优④：中心点整体优于 S1
+      const prio5 = eMx <= 1.0;                    // 优⑤：偏心点自身 <= 1.0 倍容差
+      const prioPass = (prio1?1:0) + (prio2?1:0) + (prio3?1:0) + (prio4?1:0) + (prio5?1:0);
+
+      return {
+        ...x, eccRms, cMx, eMx, hpRatio,
+        base1, base2, isQualified, basePass,
+        prio1, prio2, prio3, prio4, prio5, prioPass
+      };
+    })
+    .sort((a,b)=>
+      (b.basePass - a.basePass) ||          // 1. 先守底线（0~2分）
+      (b.prioPass - a.prioPass) ||          // 2. 再比优先加分总数（0~5分）
+      (a.hpRatio - b.hpRatio) ||            // 3. 同分比高压效果（越小越好）
+      (a.center.rms - b.center.rms) ||      // 4. 再比中心误差（越小越好）
+      (a.eccRms - b.eccRms) ||              // 5. 再比偏心误差（越小越好）
+      (a.mx - b.mx)                         // 6. 兜底比最差容差比
+    );
+
+  const rec={name,cands,best:cands[0],s1};
+  recCache[name]=rec;
+  return rec;
 }
+
 function updateRecUI(){
   const rec=recommend(curS);
   document.querySelectorAll("#tabs .tab").forEach(t=>{
-    const isBest=!!rec&&t.dataset.scheme===rec.best.m;
+    const isBest=!!rec && rec.best.isQualified && t.dataset.scheme===rec.best.m;
     t.classList.toggle("best",isBest);
-    t.title=isBest?"按四条验收需求自动推荐":"";
+    t.title=isBest?"符合底线并按优先规则自动推荐":"";
   });
   const el=document.getElementById("recNote");
   if(!rec){el.innerHTML="";return;}
   const b=rec.best;
-  const c3txt=b.ok3?"✓":(b.centerBetter?b.beats+"/4 台偏心更优":"中心差于S1");
-  el.innerHTML=`<span title="①容差 ②高压 ③中心+偏心 ④中心权重≤16：先比满足条数，再比中心/偏心是否优于S1，最后比最差容差比">自动推荐：<b>${b.m}</b></span>`+
-    `<span class="rec-badge ${b.ok1?"ok":"no"}" title="30~200N 每 10N 分段 RMS / 容差的最大值">① 容差 ${b.ok1?"✓":"✗ "+b.mx.toFixed(2)+"×"}</span>`+
-    `<span class="rec-badge ${b.ok2?"ok":"no"}" title="中心与 4 个偏心文件的 150N 以上 RMS 均比 S1 好 10% 以上">② 高压优于S1 ${b.ok2?"✓":"✗"}</span>`+
-    `<span class="rec-badge ${b.ok3?"ok":"no"}" title="中心 RMS 低于 S1，且 4 个偏心文件逐台低于 S1">③ 中心+偏心 ${c3txt}</span>`+
-    `<span class="rec-badge ok">④ 中心 ${REC_WEIGHT[b.m]}x ✓</span>`+
-    `<span style="opacity:.85">最差 误差/容差 ${b.mx.toFixed(2)}× ｜ 中心 ${b.center.rms.toFixed(2)}N（S1 ${rec.s1.center.rms.toFixed(2)}N）</span>`;
+  const titleHtml = b.isQualified
+    ? `<span>自动推荐：<b>${b.m}</b></span>`
+    : `<span style="color:var(--red)">⚠ 无达标方案（最接近：<b>${b.m}</b>）</span>`;
+
+  el.innerHTML = titleHtml +
+    `<span class="rec-badge ${b.base1?"ok":"no"}">底① 中心≤1.15× (${b.cMx.toFixed(2)}×)</span>`+
+    `<span class="rec-badge ${b.base2?"ok":"no"}">底② 偏心优S1 ${b.base2?"✓":"✗"}</span>`+
+    `<span class="rec-badge ${b.prio1?"ok":"no"}">优① ≤0.9× (${b.cMx.toFixed(2)}×) ${b.prio1?"✓":"✗"}</span>`+
+    `<span class="rec-badge ${b.prio2?"ok":"no"}">优② ≤0.8× (${b.cMx.toFixed(2)}×) ${b.prio2?"✓":"✗"}</span>`+
+    `<span class="rec-badge ${b.prio3?"ok":"no"}">优③ 高压优S1 ${b.prio3?"✓":"✗"}</span>`+
+    `<span class="rec-badge ${b.prio4?"ok":"no"}">优④ 中心优S1 ${b.prio4?"✓":"✗"}</span>`+
+    `<span class="rec-badge ${b.prio5?"ok":"no"}">优⑤ 偏心≤1.0× (${b.eMx.toFixed(2)}×)</span>`+
+    `<span style="opacity:.85">中心 ${b.center.rms.toFixed(2)}N（S1 ${rec.s1.center.rms.toFixed(2)}N）</span>`;
 }
 
 function copyParams(){
