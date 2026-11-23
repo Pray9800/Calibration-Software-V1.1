@@ -14,7 +14,7 @@ V1.1 与 `标定软件exe\` 的唯一结构差异：**A~F 求解从 index.html �
 | 页签 | 功能 |
 |---|---|
 | 标定采集 | 压力机 TCP 连接与加压、蓝牙串口连接、A~F 参数读写、名称/G01~G03/关机、8 通道实时曲线、CSV 导出 |
-| 参数计算 | 上传 5 个 CSV → 自动判左右侧 → 8 个方案拟合 → 得到 A~F → 一键填入采集页 |
+| 参数计算 | 上传 5 个 CSV → 自动判左右侧 → 6 个方案拟合 → 得到 A~F → 一键填入采集页 |
 
 与原 Qt 软件的对应关系：
 
@@ -39,7 +39,7 @@ V1.1 与 `标定软件exe\` 的唯一结构差异：**A~F 求解从 index.html �
 |---|---|---|
 | 窗口/渲染 | pywebview 6.2.1 + Edge WebView2 | Chromium 内核，`gui="edgechromium"` |
 | 后端 | Python 3.11.7 | 串口、TCP、CSV、文件对话框、状态缓存 |
-| 算法 | numpy 2.4.6 | 8 个方案的 A~F 求解（`src\algorithm.py`） |
+| 算法 | numpy 2.4.6 | 6 个方案的 A~F 求解（`src\algorithm.py`） |
 | 串口 | pyserial 3.5 | 115200 8N1 |
 | 前端 | 原生 HTML/CSS/JS | 无框架、无构建步骤，图表用 Canvas 2D |
 | 打包 | PyInstaller 6.22.3 | onefile / windowed |
@@ -130,13 +130,13 @@ index.html  用返回的 A~F 算分段 RMS、画图、推荐
 
 ### 5.1 方案配置表
 
-8 个方案集中在 `algorithm.py` 的 `PROFILES`（`algorithm.py:27`）：
+6 个方案集中在 `algorithm.py` 的 `PROFILES`（`algorithm.py:27`）：
 
 | 字段 | 取值 | 含义 |
 |---|---|---|
 | `family` | `alt` / `opt` | alt=原始通道值、边界按 k 均值缩放；opt=逐通道归一化、绝对边界 20~200 |
 | `weight` | `eq` / `tol10` / `tol` | 等权 / 容差权（alt 版）/ 容差权（opt 版） |
-| `center` | 1 / 8 / 16 / 32 | 中心文件权重倍数 |
+| `center` | 1 / 8 / 16 | 中心文件权重倍数 |
 | `high` | `none` / `fixed4` / `linear4` | 150N 以上权重：不加 / 固定 ×4 / 150→220N 线性 1→4 |
 | `bounds` | (0.6,1.4) 等 | alt 专属：A~D 边界 = 倍数 × k 均值 |
 
@@ -430,7 +430,7 @@ P = t - E*t² - F*t
 | `_weights` | `algorithm.py:95` | 按 profile 生成容差权重、高压权重、中心倍率 |
 | `_initial_ef` | `algorithm.py:130` | 迭代/优化初值（E/F 或 b=55） |
 | `fit_profile` | `algorithm.py:154` | 交替迭代或优化求解，返回 `[A,B,C,D,E,F]` |
-| `fit_all` | `algorithm.py:208` | 依次跑 8 个方案，返回 `{方案名: 参数}` |
+| `fit_all` | `algorithm.py:208` | 依次跑 6 个方案，返回 `{方案名: 参数}` |
 | `read_csv` | `algorithm.py:216` | 读 CSV，空字段按 0 处理（对齐 JS `Number('')===0`） |
 
 前端保留：
@@ -451,8 +451,6 @@ P = t - E*t² - F*t
 | S2联合 | `family="alt", weight="eq", center=1, bounds=(0.6,1.4)` |
 | S2中心8x | `family="alt", weight="eq", center=8` |
 | S2容差优先 | `family="alt", weight="tol10", center=8` |
-| S2中心优先 | `family="alt", weight="eq", center=32, bounds=(0.3,3.0)` |
-| S2中心16x+高压4x | `family="opt", weight="tol", center=16, high="fixed4"` |
 | S2中心16x+高压4x（线性版） | `family="opt", weight="tol", center=16, high="linear4"` |
 | S2中心8x+高压4x（线性版） | `family="opt", weight="tol", center=8, high="linear4"` |
 

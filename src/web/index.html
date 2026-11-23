@@ -552,8 +552,8 @@ document.addEventListener("DOMContentLoaded",()=>{
 const DATA = {"_order": [], "_tol": [3, 3, 3, 3.45, 4.3, 5.1, 5.83, 6.51, 7.13, 7.68, 8.18, 8.63, 9.01, 9.33, 9.6, 9.8, 9.95, 10.04, 10.07, 10.04, 10.25, 10.75]};
 
 const SENSORS = [];
-const SCHEMES = ["S1","S2联合","S2中心8x","S2容差优先","S2中心优先","S2中心16x+高压4x","S2中心16x+高压4x（线性版）","S2中心8x+高压4x（线性版）","自定义"];
-let curS = null, curM = "S2中心16x+高压4x";
+const SCHEMES = ["S1","S2联合","S2中心8x","S2容差优先","S2中心16x+高压4x（线性版）","S2中心8x+高压4x（线性版）","自定义"];
+let curS = null, curM = "S2中心16x+高压4x（线性版）";
 const TOL = DATA["_tol"];
 
 const sensorRow = document.getElementById("sensorRow");
@@ -756,7 +756,7 @@ function drawChart(id,cur,base,tol,color,startSeg){
 }
 
 /* ===== 自动推荐：按四条验收需求给当前传感器选方案 ===== */
-const REC_WEIGHT={"S2联合":1,"S2中心8x":8,"S2容差优先":8,"S2中心16x+高压4x":16,"S2中心16x+高压4x（线性版）":16,"S2中心8x+高压4x（线性版）":8};
+const REC_WEIGHT={"S2联合":1,"S2中心8x":8,"S2容差优先":8,"S2中心16x+高压4x（线性版）":16,"S2中心8x+高压4x（线性版）":8};
 const REC_SCHEMES=Object.keys(REC_WEIGHT);
 const recCache={};
 function rawMet(rows,params){
@@ -779,23 +779,26 @@ function evalRec(name,m){
   return {m,center,ecc,mx};
 }
 function recommend(name){
-  if(recCache[name])return recCache[name];
-  const s1=evalRec(name,"S1");
-  if(!s1)return null;
-  const s1ehp=s1.ecc.reduce((s,v)=>s+v.hp,0)/s1.ecc.length;
-  const cands=REC_SCHEMES.filter(m=>REC_WEIGHT[m]<=16).map(m=>evalRec(name,m)).filter(Boolean).map(x=>{
-    const beats=x.ecc.filter((e,i)=>e.rms<s1.ecc[i].rms).length;
-    const ehp=x.ecc.reduce((s,v)=>s+v.hp,0)/x.ecc.length;
-    const ok1=x.mx<=1.0;
-    const ok2=(s1.center.hp-x.center.hp)/s1.center.hp>=0.10 && (s1ehp-ehp)/s1ehp>=0.10;
-    const ok3=x.center.rms<s1.center.rms && beats===4;
-    const ok4=REC_WEIGHT[x.m]<=16;
-    return {...x,beats,ok1,ok2,ok3,ok4,centerBetter:x.center.rms<s1.center.rms,
-            pass:(ok1?1:0)+(ok2?1:0)+(ok3?1:0)+(ok4?1:0)};
-  }).sort((a,b)=>b.pass-a.pass||(b.centerBetter-a.centerBetter)||(b.beats-a.beats)||(a.mx-b.mx)||(a.center.rms-b.center.rms));
-  const rec={name,cands,best:cands[0],s1};
-  recCache[name]=rec;
-  return rec;
+  if(recCache[name])return recCache[name]; // 已计算过时直接返回缓存
+  const s1=evalRec(name,"S1"); // 计算 S1 基准方案的误差指标
+  if(!s1)return null; // 没有 S1 结果时无法比较，返回空
+  const s1ehp=s1.ecc.reduce((s,v)=>s+v.hp,0)/s1.ecc.length; // 计算 S1 四组偏心数据的高压段 RMS 平均值
+  const cands=REC_SCHEMES.filter(m=>REC_WEIGHT[m]<=16) // 仅考虑权重不超过 16 的候选方案
+    .map(m=>evalRec(name,m)) // 计算每个候选方案的误差指标
+    .filter(Boolean) // 排除没有有效评估结果的方案
+    .map(x=>{ // 逐个计算候选方案是否满足推荐条件
+      const beats=x.ecc.filter((e,i)=>e.rms<s1.ecc[i].rms).length; // 统计 RMS 优于 S1 的偏心数据组数
+      const ehp=x.ecc.reduce((s,v)=>s+v.hp,0)/x.ecc.length; // 计算候选方案四组偏心数据的高压段 RMS 平均值
+      const ok1=x.mx<=1.0; // 条件1：所有被检查分段的 RMS/容差最大值不超过 1
+      const ok2=(s1.center.hp-x.center.hp)/s1.center.hp>=0.10 && (s1ehp-ehp)/s1ehp>=0.10; // 条件2：中心及偏心平均高压段 RMS 都比 S1 至少降低 10%
+      const ok3=x.center.rms<s1.center.rms && beats===4; // 条件3：中心 RMS 优于 S1，且四组偏心 RMS 全部优于 S1
+      const ok4=REC_WEIGHT[x.m]<=16; // 条件4：候选方案权重不超过 16（与上面的筛选条件一致）
+      return {...x,beats,ok1,ok2,ok3,ok4,centerBetter:x.center.rms<s1.center.rms, // 保留原指标并附加条件结果及中心 RMS 比较结果
+              pass:(ok1?1:0)+(ok2?1:0)+(ok3?1:0)+(ok4?1:0)}; // 统计通过条件数，范围为 0～4
+    }).sort((a,b)=>b.pass-a.pass||(b.centerBetter-a.centerBetter)||(b.beats-a.beats)||(a.mx-b.mx)||(a.center.rms-b.center.rms)); // 依次按通过数、中心是否更优、偏心胜出数排序；再优先选 mx 和中心 RMS 较小者
+  const rec={name,cands,best:cands[0],s1}; // 汇总名称、候选列表、首选方案和 S1 基准
+  recCache[name]=rec; // 缓存结果，避免重复计算
+  return rec; // 返回推荐结果
 }
 function updateRecUI(){
   const rec=recommend(curS);
@@ -908,44 +911,9 @@ const DOCS={
 </ol>
 <p><b>特点</b>：低压段 RMS 0.3~0.9N（解决低压超差），全程 10~200N 在容差线内；中心 190~200N 仍优于 S1。参数温和（0.04~0.09），实测泛化风险最低。唯一代价：200~220N 逼近容差上限（比值 0.89~1.11）。</p>`,
 
-"S2中心优先":COMMON_HEAD+`
-<h3>S2中心优先（等权 + 中心 32x）— 交替迭代求解</h3>
-<p><b>目标：在不改公式的前提下，把中心点精度做到全面优于 S1。</b></p>
-<ol>
-<li><b>取消S2容差优先</b>：所有点权重取 1（不再用 1/tol²）。</li>
-<li><b>中心文件整体 ×32</b>：中心点占损失权重 32/(4+32) ≈ 89%。</li>
-<li><b>放宽 ABCD 边界</b>：从 0.6k~1.4k 放宽到 <b>0.3k~3.0k</b>。</li>
-<li><b>求解方式</b>：ABCD ↔ EF 分步交替迭代（固定 EF 解 ABCD → 固定 ABCD 解 EF → 循环到收敛）。</li>
-</ol>
-<div class="formula">min&nbsp; 32·Σ<sub>中心</sub>[err]² + 1·Σ<sub>偏心</sub>[err]²，&nbsp;&nbsp;0.3k ≤ A,B,C,D ≤ 3.0k</div>
-<p><b>代价</b>：等权不照顾"低压容差只有 1N"，低压段误差/容差比值偏高；中心 RMS 与低压达标率在本模型下互斥。</p>`,
-
-"S2中心16x+高压4x":COMMON_HEAD+`
-<h3>S2中心16x+高压4x — 按四条验收要求设计的交替迭代方案</h3>
-<p><b>四条需求：① 30~200N 误差 3N~10N 均匀 ② 高压比 S1 好 ③ 中心点优先且偏心比 S1 好 ④ 中心权重 ≤16 倍。</b></p>
-<h3>1. 容差曲线（30N→3N，200N→10N）</h3>
-<div class="formula">tol(P) = P × [ 10% − 5% × (P−30) / 170 ]，&nbsp;&nbsp;P ∈ [30, 200]N</div>
-<p>30N 处容差 3N（10%），200N 处容差 10N（5%），线性过渡。权重 = 1/tol²。</p>
-<h3>2. 逐通道归一化（不做四通道求和）</h3>
-<p>每个通道除以自己的量程 range<sub>j</sub>，得到 0~1 无量纲数：</p>
-<div class="formula">c̃<sub>j</sub> = ch<sub>j</sub> / range<sub>j</sub>，&nbsp;&nbsp;t = B̃₁·c̃₁ + B̃₂·c̃₂ + B̃₃·c̃₃ + B̃₄·c̃₄</div>
-<p>起点 B̃ = 55N（满量程均分四片），边界 20~200N（绝对物理量，不依赖 k̄）。<b>全程不做"四通道加一起求 k"。</b></p>
-<h3>3. 中心 16x + 高压 4x 加权</h3>
-<div class="formula">w = 1/tol² × (中心 ? 16 : 1) × (P≥150N ? 4 : 1)</div>
-<p>中心权重 16 倍（满足 ≤16 约束），150N 以上再 ×4 压高压段误差。</p>
-<h3>4. 交替迭代求解（ABCD ↔ EF）</h3>
-<ol>
-<li>固定 E/F，Gauss-Newton 解 A/B/C/D（逐通道，边界裁剪）；</li>
-<li>固定 A/B/C/D，加权线性最小二乘解 E/F；</li>
-<li>参数变化 &lt; 1e-12 即停，否则回到第 1 步。</li>
-</ol>
-<h3>回代公式</h3>
-<div class="formula">A<sub>j</sub> = B̃<sub>j</sub> / range<sub>j</sub>&nbsp;&nbsp;（归一化系数换回 APP 要的 N/V 系数）</div>
-<p><b>特点</b>：无求和 + S2容差优先 + 中心16x + 高压4x + 交替迭代。G 盘 6 台数据全部达标（30~200N max ≤0.79）。</p>`,
-
 "S2中心16x+高压4x（线性版）":COMMON_HEAD+`
 <h3>S2中心16x+高压4x（线性版）— 高压权重线性递增</h3>
-<p>与「S2中心16x+高压4x」唯一区别：<b>高压权重从固定 ×4 改成线性递增</b>。</p>
+<p>高压权重从 150N 起线性递增，220N 达到 ×4，避免 150N 处权重突然跳变。</p>
 <div class="formula">hw(P) = 1 + 3 × (P−150)/70，&nbsp;&nbsp;P ∈ [150, 220]N</div>
 <p>150N 处高压权重 = 1（不额外加权），220N 处 = 4，中间线性过渡；150N 以下 = 1，220N 以上 = 4。其余（归一化、容差30~200N、中心16x、交替迭代）完全一致。</p>
 <div class="formula">w = 1/tol² × (中心 ? 16 : 1) × hw(P)</div>
@@ -964,10 +932,6 @@ const DOCS={
 "交替中心8x":ALT_HEAD+`
 <p><b>本页配置</b>：中心文件权重 ×8，偏心 ×1，ABCD 边界 0.6k~1.4k。<br>
 对应联合求解的「S2中心8x」。</p>`,
-"交替中心优先":ALT_HEAD+`
-<p><b>本页配置</b>：5 个文件等权（w=1），<b>中心文件 ×32</b>，ABCD 边界放宽到 <b>0.3k̄~3.0k̄</b>。<br>
-对应联合求解的「S2中心优先」。</p>
-<p><b>实测</b>：中心 RMS 与联合解接近（小号右 1.59 vs 1.76、中号左 1.41 vs 1.48、大号右/大号左 完全相同），但偏心 RMS 更差（小号左 5.76 vs 2.54）——放宽边界后交替更容易卡在角点。</p>`,
 
 "交替容差":ALT_HEAD+`
 <p><b>本页配置</b>：按S2容差优先 w=1/tol²，中心再 ×8，ABCD 边界 0.6k~1.4k。<br>
@@ -1169,7 +1133,7 @@ function runCustomFit(){
       let _n=DATA["_order"].filter(s=>s.startsWith("自定义")).length+1;
       while(DATA["_order"].includes("自定义"+_n))_n++;
       const name="自定义"+_n;
-      log("拟合中：8 个方案（Python 求解）"+dropNote);
+      log("拟合中：6 个方案（Python 求解）"+dropNote);
       const res=await callApi("fit_all",compact,centerIdx);
       if(!res||!res.ok||!res.schemes){
         log("❌ 拟合失败: "+((res&&res.error)||"后端无响应"));

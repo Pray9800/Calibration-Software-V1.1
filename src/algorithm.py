@@ -16,16 +16,14 @@ SCHEME_ORDER = [
     "S2联合",
     "S2中心8x",
     "S2容差优先",
-    "S2中心优先",
-    "S2中心16x+高压4x",
     "S2中心16x+高压4x（线性版）",
     "S2中心8x+高压4x（线性版）",
 ]
 # PROFILES 字段说明：
-#   family=alt: 原始通道值、A~D 边界按 k 均值成比例（0.6~1.4，中心优先 0.3~3.0）
+#   family=alt: 原始通道值、A~D 边界按 k 均值成比例（0.6~1.4）
 #   family=opt: 逐通道归一化、A~D 绝对边界 20~200
 #   weight  eq：各数据点等权；tol10/tol：按压力容差反比例加权
-#   center  中心文件的权重倍数；配合 weight 使用，如 8、16、32
+#   center  中心文件的权重倍数；配合 weight 使用，如 1、8、16
 #   high    none：高压段不额外加权；fixed4：>=150N 固定 4 倍；
 #           linear4：150~220N 从 1 倍线性增加到 4 倍
 #   bounds  仅 family=alt 使用：(下限系数, 上限系数)，乘以 k 均值得到实际 A~D 边界
@@ -33,8 +31,6 @@ PROFILES = {
     "S2联合": dict(family="alt", weight="eq", center=1, high="none", bounds=(0.6, 1.4)),
     "S2中心8x": dict(family="alt", weight="eq", center=8, high="none", bounds=(0.6, 1.4)),
     "S2容差优先": dict(family="alt", weight="tol10", center=8, high="none", bounds=(0.6, 1.4)),
-    "S2中心优先": dict(family="alt", weight="eq", center=32, high="none", bounds=(0.3, 3.0)),
-    "S2中心16x+高压4x": dict(family="opt", weight="tol", center=16, high="fixed4"),
     "S2中心16x+高压4x（线性版）": dict(family="opt", weight="tol", center=16, high="linear4"),
     "S2中心8x+高压4x（线性版）": dict(family="opt", weight="tol", center=8, high="linear4"),
 }
