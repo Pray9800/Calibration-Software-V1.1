@@ -16,7 +16,7 @@ def main():
     api = Api()
     index = resource_dir() / "web" / "index.html"
     window = webview.create_window(
-        "GAPSENSE S2 标定软件",
+        "标定软件 GAPSENSE-TOOL V1.3",
         url=index.as_uri(),
         js_api=api,
         width=1440,

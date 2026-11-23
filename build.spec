@@ -33,7 +33,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name="GAPSENSE-S2-标定软件V1.1",
+    name="GAPSENSE-TOOL V1.3",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

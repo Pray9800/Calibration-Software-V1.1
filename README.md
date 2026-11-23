@@ -1,9 +1,10 @@
-# GAPSENSE S2 标定软件 V1.1 开发文档
+# 打包指令  & "C:\Users\WP\.venvs\gapsense\Scripts\python.exe" -m PyInstaller --noconfirm --clean build.spec
+# 标定软件 GAPSENSE-TOOL V1.3 开发文档
 
 单文件桌面程序，替代原 Qt 版 `JJ_Calibration_Tool`，并合并「标定计算器测试版_容错版.html」的拟合功能。
 V1.1 与 `标定软件exe\` 的唯一结构差异：**A~F 求解从 index.html 抽出到 `src\algorithm.py`，方案由 profile 表驱动**。
 
-- 可执行文件：`GAPSENSE-S2-标定软件V1.1.exe`（双击运行）
+- 可执行文件：`GAPSENSE-TOOL V1.3.exe`（双击运行）
 - 源码目录：`src\`
 - 目标系统：Windows 10 1803+ / Windows 11（需要 WebView2 运行时）
 
@@ -52,7 +53,7 @@ Python 负责 I/O 和**参数求解**；前端只做展示：读 CSV、画图、
 
 ```
 标定软件V1.1\
-├─ GAPSENSE-S2-标定软件V1.1.exe 交付程序
+├─ GAPSENSE-TOOL V1.3.exe 交付程序
 ├─ build.spec                   打包配置（SRC 指向本目录 src）
 ├─ tests\
 │  ├─ golden.json               原 JS 求解器产出的基准参数
@@ -174,7 +175,7 @@ index.html  用返回的 A~F 算分段 RMS、画图、推荐
   "E:\EMB-01\S2标定计算器\标定软件V1.1\build.spec"
 ```
 
-产物 `GAPSENSE-S2-标定软件V1.1.exe`，复制回 `标定软件V1.1\`。
+产物 `GAPSENSE-TOOL V1.3.exe`，复制回 `标定软件V1.1\`。
 numpy 由 PyInstaller 自动收集，不走 spec 手动配置。
 
 ### 6.2 不进 spec 的直接命令
@@ -182,7 +183,7 @@ numpy 由 PyInstaller 自动收集，不走 spec 手动配置。
 ```bat
 cd /d "E:\EMB-01\S2标定计算器\标定软件V1.1\src"
 "C:\Users\WP\AppData\Local\Temp\gapsense-venv\Scripts\python.exe" -m PyInstaller --noconfirm --clean --onefile --windowed ^
-  --name "GAPSENSE-S2-标定软件V1.1" --add-data "web;web" --collect-all webview --hidden-import clr main.py
+  --name "GAPSENSE-TOOL V1.3" --add-data "web;web" --collect-all webview --hidden-import clr main.py
 ```
 
 ### 6.3 打包注意
@@ -590,7 +591,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name="GAPSENSE-S2-标定软件V1.1",
+    name="GAPSENSE-TOOL V1.3",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
