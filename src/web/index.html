@@ -815,7 +815,7 @@ function recommend(name){
       const prio4 = x.center.rms < s1.center.rms;  // 优④：中心点整体优于 S1
       const prio5 = eMx <= 1.0;                    // 优⑤：偏心点自身 <= 1.0 倍容差
       const prio6 = eMxAvg <= 0.9;                 // 优⑥：4 个偏心点各段平均后最差段 <= 0.9 倍容差
-      const prioPass = (prio1?1:0) + (prio2?1:0) + (prio3?1:0) + (prio4?1:0) + (prio5?1:0) + (prio6?1:0);
+      const prioPass = (prio1?1:0) + (prio2?1:0) + (prio3?1:0) + (prio4?1:0) + (prio5?1:0) + (prio6?1:0);  //总积分
 
       return {
         ...x, eccRms, cMx, eMx, eMxAvg, hpRatio,
@@ -823,7 +823,7 @@ function recommend(name){
         prio1, prio2, prio3, prio4, prio5, prio6, prioPass
       };
     })
-    .sort((a,b)=>
+    .sort((a,b)=>                             //相同得分优先级
       (b.basePass - a.basePass) ||          // 1. 先守底线（0~2分）
       (b.prioPass - a.prioPass) ||          // 2. 再比优先加分总数（0~6分）
       (a.hpRatio - b.hpRatio) ||            // 3. 同分比高压效果（越小越好）
