@@ -799,6 +799,7 @@ function recommend(name){
       const eccHp  = x.ecc.reduce((s,v)=>s+v.hp,0)/x.ecc.length;
       const cMx = maxRatio(x.center.segs);
       const eMx = Math.max(...x.ecc.map(e=>maxRatio(e.segs)));
+      const eMxAvg = maxRatio(avgSegs(x.ecc.map(e=>e.segs)));
 
       // 【两条硬底线】(0~2分)
       const base1 = cMx <= 1.15;        // 底①：中心点最差容差比 <= 1.15
@@ -806,24 +807,25 @@ function recommend(name){
       const isQualified = base1 && base2;
       const basePass = (base1?1:0) + (base2?1:0);
 
-      // 【五条统一优先项】(0~5分)
+      // 【六条统一优先项】(0~6分)
       const hpRatio = Math.max(x.center.hp / s1.center.hp, eccHp / s1EccHp);
       const prio1 = cMx <= 0.9;                    // 优①：中心容差比 <= 0.9
       const prio2 = cMx <= 0.8;                    // 优②：中心容差比 <= 0.8
       const prio3 = hpRatio < 1.0;                 // 优③：高压段中心与偏心均优于 S1
       const prio4 = x.center.rms < s1.center.rms;  // 优④：中心点整体优于 S1
       const prio5 = eMx <= 1.0;                    // 优⑤：偏心点自身 <= 1.0 倍容差
-      const prioPass = (prio1?1:0) + (prio2?1:0) + (prio3?1:0) + (prio4?1:0) + (prio5?1:0);
+      const prio6 = eMxAvg <= 0.9;                 // 优⑥：4 个偏心点各段平均后最差段 <= 0.9 倍容差
+      const prioPass = (prio1?1:0) + (prio2?1:0) + (prio3?1:0) + (prio4?1:0) + (prio5?1:0) + (prio6?1:0);
 
       return {
-        ...x, eccRms, cMx, eMx, hpRatio,
+        ...x, eccRms, cMx, eMx, eMxAvg, hpRatio,
         base1, base2, isQualified, basePass,
-        prio1, prio2, prio3, prio4, prio5, prioPass
+        prio1, prio2, prio3, prio4, prio5, prio6, prioPass
       };
     })
     .sort((a,b)=>
       (b.basePass - a.basePass) ||          // 1. 先守底线（0~2分）
-      (b.prioPass - a.prioPass) ||          // 2. 再比优先加分总数（0~5分）
+      (b.prioPass - a.prioPass) ||          // 2. 再比优先加分总数（0~6分）
       (a.hpRatio - b.hpRatio) ||            // 3. 同分比高压效果（越小越好）
       (a.center.rms - b.center.rms) ||      // 4. 再比中心误差（越小越好）
       (a.eccRms - b.eccRms) ||              // 5. 再比偏心误差（越小越好）
@@ -850,13 +852,14 @@ function updateRecUI(){
     : `<span style="color:var(--red)">⚠ 无达标方案（最接近：<b>${b.m}</b>）</span>`;
 
   el.innerHTML = titleHtml +
-    `<span class="rec-badge ${b.base1?"ok":"no"}">底① 中心≤1.15× (${b.cMx.toFixed(2)}×)</span>`+
+    `<span class="rec-badge ${b.base1?"ok":"no"}">底① 中心≤1.15× (${b.cMx.toFixed(2)}×) ${b.base1?"✓":"✗"}</span>`+
     `<span class="rec-badge ${b.base2?"ok":"no"}">底② 偏心优S1 ${b.base2?"✓":"✗"}</span>`+
     `<span class="rec-badge ${b.prio1?"ok":"no"}">优① ≤0.9× (${b.cMx.toFixed(2)}×) ${b.prio1?"✓":"✗"}</span>`+
     `<span class="rec-badge ${b.prio2?"ok":"no"}">优② ≤0.8× (${b.cMx.toFixed(2)}×) ${b.prio2?"✓":"✗"}</span>`+
     `<span class="rec-badge ${b.prio3?"ok":"no"}">优③ 高压优S1 ${b.prio3?"✓":"✗"}</span>`+
     `<span class="rec-badge ${b.prio4?"ok":"no"}">优④ 中心优S1 ${b.prio4?"✓":"✗"}</span>`+
-    `<span class="rec-badge ${b.prio5?"ok":"no"}">优⑤ 偏心≤1.0× (${b.eMx.toFixed(2)}×)</span>`+
+    `<span class="rec-badge ${b.prio5?"ok":"no"}">优⑤ 偏心≤1.0× (${b.eMx.toFixed(2)}×) ${b.prio5?"✓":"✗"}</span>`+
+    `<span class="rec-badge ${b.prio6?"ok":"no"}">优⑥ 偏心均值≤0.9× (${b.eMxAvg.toFixed(2)}×) ${b.prio6?"✓":"✗"}</span>`+
     `<span style="opacity:.85">中心 ${b.center.rms.toFixed(2)}N（S1 ${rec.s1.center.rms.toFixed(2)}N）</span>`;
 }
 
