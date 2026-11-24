@@ -1,4 +1,5 @@
 # 打包指令  & "C:\Users\WP\.venvs\gapsense\Scripts\python.exe" -m PyInstaller --noconfirm --clean build.spec
+# VERSION V1.3
 # 标定软件 GAPSENSE-TOOL V1.3 开发文档
 
 单文件桌面程序，替代原 Qt 版 `JJ_Calibration_Tool`，并合并「标定计算器测试版_容错版.html」的拟合功能。
