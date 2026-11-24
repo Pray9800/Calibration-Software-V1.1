@@ -53,7 +53,7 @@ Python 负责 I/O 和**参数求解**；前端只做展示：读 CSV、画图、
 ## 3. 目录结构
 
 ```
-标定软件V1.1\
+标定软件V1.3\
 ├─ GAPSENSE-TOOL V1.3.exe 交付程序
 ├─ build.spec                   打包配置（SRC 指向本目录 src）
 ├─ tests\
@@ -70,9 +70,9 @@ Python 负责 I/O 和**参数求解**；前端只做展示：读 CSV、画图、
 `APP_DIR` 规则（`backend.py:16`）：
 
 - 打包后 = exe 所在目录
-- 源码运行 = `标定软件V1.1\`（`backend.py` 的上一级）
+- 源码运行 = `标定软件V1.3\`（`backend.py` 的上一级）
 
-所以两种方式下 CSV 都落在 `标定软件V1.1\CSV_file\`。
+所以两种方式下 CSV 都落在 `标定软件V1.3\CSV_file\`。
 
 ---
 
@@ -103,13 +103,13 @@ py -3.11 -m venv .venv
 源码直接运行（改前端或后端后不必打包）：
 
 ```bat
-"C:\Users\WP\AppData\Local\Temp\gapsense-venv\Scripts\python.exe" "E:\EMB-01\S2标定计算器\标定软件V1.1\src\main.py"
+"C:\Users\WP\AppData\Local\Temp\gapsense-venv\Scripts\python.exe" "E:\EMB-01\S2标定计算器\标定软件V1.3\src\main.py"
 ```
 
 跑算法回归测试：
 
 ```bat
-"C:\Users\WP\AppData\Local\Temp\gapsense-venv\Scripts\python.exe" -m unittest discover -s "E:\EMB-01\S2标定计算器\标定软件V1.1\tests" -v
+"C:\Users\WP\AppData\Local\Temp\gapsense-venv\Scripts\python.exe" -m unittest discover -s "E:\EMB-01\S2标定计算器\标定软件V1.3\tests" -v
 ```
 
 调试窗口：把 `src\main.py:28` 的 `debug=False` 改成 `True`，可右键打开 DevTools、查看 JS 报错。
@@ -159,7 +159,7 @@ index.html  用返回的 A~F 算分段 RMS、画图、推荐
 `tests\test_algorithm.py` 用 `tests\golden.json` 做回归：
 
 ```bat
-"C:\Users\WP\AppData\Local\Temp\gapsense-venv\Scripts\python.exe" -m unittest discover -s "E:\EMB-01\S2标定计算器\标定软件V1.1\tests" -v
+"C:\Users\WP\AppData\Local\Temp\gapsense-venv\Scripts\python.exe" -m unittest discover -s "E:\EMB-01\S2标定计算器\标定软件V1.3\tests" -v
 ```
 
 ---
@@ -168,21 +168,21 @@ index.html  用返回的 A~F 算分段 RMS、画图、推荐
 
 ### 6.1 用本目录的 spec
 
-`build.spec` 与本目录同级，`SRC` 指向 `标定软件V1.1\src`（换机器只改这一行）：
+`build.spec` 与本目录同级，`SRC` 指向 `标定软件V1.3\src`（换机器只改这一行）：
 
 ```bat
 "C:\Users\WP\AppData\Local\Temp\gapsense-venv\Scripts\python.exe" -m PyInstaller --noconfirm --clean ^
   --workpath "C:\Users\WP\AppData\Local\Temp\s2v11\build" --distpath "C:\Users\WP\AppData\Local\Temp\s2v11\dist" ^
-  "E:\EMB-01\S2标定计算器\标定软件V1.1\build.spec"
+  "E:\EMB-01\S2标定计算器\标定软件V1.3\build.spec"
 ```
 
-产物 `GAPSENSE-TOOL V1.3.exe`，复制回 `标定软件V1.1\`。
+产物 `GAPSENSE-TOOL V1.3.exe`，复制回 `标定软件V1.3\`。
 numpy 由 PyInstaller 自动收集，不走 spec 手动配置。
 
 ### 6.2 不进 spec 的直接命令
 
 ```bat
-cd /d "E:\EMB-01\S2标定计算器\标定软件V1.1\src"
+cd /d "E:\EMB-01\S2标定计算器\标定软件V1.3\src"
 "C:\Users\WP\AppData\Local\Temp\gapsense-venv\Scripts\python.exe" -m PyInstaller --noconfirm --clean --onefile --windowed ^
   --name "GAPSENSE-TOOL V1.3" --add-data "web;web" --collect-all webview --hidden-import clr main.py
 ```
@@ -560,7 +560,7 @@ P = t - E*t² - F*t
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_all
 
-SRC = r"E:\EMB-01\S2标定计算器\标定软件V1.1\src"
+SRC = r"E:\EMB-01\S2标定计算器\标定软件V1.3\src"
 # 移动项目后改这一行
 
 datas = [(SRC + r"\web", "web")]

@@ -1,7 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_all
 
-SRC = r"E:\EMB-01\S2标定计算器\标定软件V1.1\src"
+SRC = r"E:\EMB-01\S2标定计算器\标定软件V1.3\src"
 # 移动项目后改这一行
 
 datas = [(SRC + r"\web", "web")]

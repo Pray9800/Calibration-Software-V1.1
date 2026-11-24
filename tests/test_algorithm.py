@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]          # E:\EMB-01\S2标定计算器
-sys.path.insert(0, str(ROOT / "标定软件V1.1" / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 import algorithm as alg  # noqa: E402
 
